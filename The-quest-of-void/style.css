@@ -1,0 +1,1723 @@
+/* =========================================================
+   THE QUEST OF VOID
+   Base stylesheet
+   ========================================================= */
+
+
+/* ---------------------------------------------------------
+   RESET
+   --------------------------------------------------------- */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+:root {
+
+    /* =====================================================
+       RETRO BEIGE UI PALETTE
+       ===================================================== */
+
+    --ui-black:
+        #2B271F;
+
+    --ui-dark:
+        #373127;
+
+    --ui-base:
+        #4A4335;
+
+    --ui-panel:
+        #5B5241;
+
+    --ui-button:
+        #706653;
+
+    --ui-button-hover:
+        #817560;
+
+    --ui-border-dark:
+        #29251E;
+
+    --ui-border-light:
+        #A99B7E;
+
+    --ui-text:
+        #F1E6CA;
+
+    --ui-text-muted:
+        #C8BCA1;
+
+}
+
+
+/* ---------------------------------------------------------
+   PAGE
+   --------------------------------------------------------- */
+
+html,
+body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+
+    background: var(--ui-black);
+}
+
+
+/* =========================================================
+   MAIN GAME LAYOUT
+   ========================================================= */
+
+#game-container {
+    width: 100vw;
+    height: 100vh;
+
+    position: relative;
+
+    display: grid;
+
+    grid-template-columns: 190px minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) 100px;
+
+    background: var(--ui-dark);
+
+    overflow: hidden;
+}
+
+
+/* =========================================================
+   LEFT UI
+   ========================================================= */
+
+#left-ui {
+    grid-column: 1;
+    grid-row: 1;
+
+    display: flex;
+    flex-direction: column;
+
+    min-height: 0;
+
+    padding: 10px;
+
+    border-right: 3px solid var(--ui-border-dark);
+
+    border-right: 3px solid #111;
+
+    color: var(--ui-text);
+
+    font-family: monospace;
+
+    overflow: hidden;
+
+    user-select: none;
+}
+
+
+.ui-title {
+    padding: 10px;
+
+    margin-bottom: 12px;
+
+    background:
+    var(--ui-dark);
+
+    border:
+    2px solid
+    var(--ui-border-light);
+
+    font-size: 17px;
+    font-weight: bold;
+
+    text-align: center;
+}
+
+
+.ui-section {
+    margin-bottom: 12px;
+
+    border:
+    2px solid
+    var(--ui-border-dark);
+
+    
+    background:
+        var(--ui-panel);
+}
+
+
+.ui-section-title {
+    padding: 6px 8px;
+
+    background:
+    var(--ui-dark);
+
+    font-size: 13px;
+    font-weight: bold;
+}
+
+
+.ui-placeholder {
+    padding: 10px;
+
+    color: #bdbdbd;
+
+    font-size: 12px;
+
+    line-height: 1.6;
+}
+
+
+/* =========================================================
+   MAP WINDOW
+   ========================================================= */
+
+#map-frame {
+    grid-column: 2;
+    grid-row: 1;
+
+    position: relative;
+
+    min-width: 0;
+    min-height: 0;
+
+    overflow: hidden;
+
+    background: #000;
+
+    border-left: 2px solid #555;
+    border-bottom: 2px solid #555;
+}
+
+
+/* =========================================================
+   GAME CANVAS
+   ========================================================= */
+
+#game-canvas {
+    display: block;
+
+    width: 100%;
+    height: 100%;
+
+    cursor: grab;
+
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+}
+
+
+/* =========================================================
+   BOTTOM UI
+   ========================================================= */
+
+#bottom-ui {
+    grid-column: 1 / 3;
+    grid-row: 2;
+
+    display: flex;
+    align-items: center;
+
+    gap: 14px;
+
+    padding: 10px 14px;
+
+    background: var(--ui-base);
+
+    border-top:
+    3px solid
+    var(--ui-border-dark);
+
+    color:
+    var(--ui-text);
+
+    font-family: monospace;
+
+    user-select: none;
+}
+
+
+.bottom-placeholder {
+    width: 110px;
+
+    font-size: 13px;
+    font-weight: bold;
+
+    text-align: center;
+}
+
+
+.toolbar-slots {
+    display: flex;
+
+    gap: 6px;
+}
+
+
+.toolbar-slot {
+
+    width: 58px;
+    height: 58px;
+
+    background:
+        var(--ui-button);
+
+    border:
+        2px solid
+        var(--ui-border-dark);
+
+    box-shadow:
+        inset 1px 1px 0
+            var(--ui-border-light),
+
+        inset -1px -1px 0
+            var(--ui-border-dark);
+}
+
+
+/* =========================================================
+   DEBUG PANEL
+   ========================================================= */
+
+#debug-panel {
+    position: absolute;
+
+    top: 10px;
+    left: 10px;
+
+    padding: 9px 12px;
+
+    background: rgba(0, 0, 0, 0.78);
+
+    border: 1px solid rgba(255, 255, 255, 0.25);
+
+    color: white;
+
+    font-family: monospace;
+    font-size: 12px;
+
+    line-height: 1.6;
+
+    pointer-events: none;
+
+    user-select: none;
+}
+
+
+.game-title {
+    margin-bottom: 4px;
+
+    font-weight: bold;
+}
+
+/* =========================================================
+   UI BUTTONS
+   ========================================================= */
+
+.ui-section-content {
+    padding: 8px;
+}
+
+
+.ui-action-button {
+    width: 100%;
+
+    padding: 8px;
+
+    background:
+    var(--ui-button);
+
+    border:
+    2px solid
+    var(--ui-border-dark);
+
+    color:
+    var(--ui-text);
+
+    font-family: monospace;
+    font-size: 12px;
+
+    cursor: pointer;
+}
+
+
+.ui-action-button:hover {
+    background:
+        var(--ui-button-hover);
+}
+
+
+.ui-action-button.active {
+    background: #555;
+    border-color: #888;
+}
+
+
+/* =========================================================
+   TOOLBAR BUTTONS
+   ========================================================= */
+
+.toolbar-button {
+    padding: 4px;
+
+    color: white;
+
+    font-family: monospace;
+    font-size: 10px;
+
+    cursor: pointer;
+}
+
+
+.toolbar-button:hover {
+    background: #444;
+}
+
+
+.toolbar-button.active {
+    outline: 2px solid white;
+    background: #505050;
+}
+
+.settlement-readout {
+    margin-top: 10px;
+
+    padding-top: 8px;
+
+    border-top: 1px solid #555;
+
+    color: #cfcfcf;
+
+    font-size: 11px;
+    line-height: 1.7;
+}
+
+.toolbar-button:disabled {
+    opacity: 0.45;
+    cursor: default;
+}
+
+/* =========================================================
+   SETTINGS
+   ========================================================= */
+
+.settings-launch {
+    margin-top: auto;
+}
+
+
+#settings-overlay {
+    position: fixed;
+
+    inset: 0;
+
+    display: none;
+    align-items: center;
+    justify-content: center;
+
+    background: rgba(0, 0, 0, 0.65);
+
+    z-index: 1000;
+}
+
+
+#settings-overlay.open {
+    display: flex;
+}
+
+
+#settings-menu {
+    width: 320px;
+
+    padding: 14px;
+
+    background:
+        var(--ui-base);
+
+    border:
+        3px solid
+        var(--ui-border-dark);
+
+    box-shadow:
+        inset 1px 1px 0
+            var(--ui-border-light),
+
+        inset -1px -1px 0
+            var(--ui-border-dark);
+
+    color:
+        var(--ui-text);
+
+    font-family: monospace;
+}
+
+
+.settings-title {
+    padding: 9px;
+
+    margin-bottom: 12px;
+
+    background: #151515;
+
+    border: 2px solid #444;
+
+    text-align: center;
+
+    font-size: 16px;
+    font-weight: bold;
+}
+
+
+#save-status {
+    min-height: 42px;
+
+    margin-bottom: 10px;
+    padding: 8px;
+
+    background: #1a1a1a;
+
+    border: 1px solid #444;
+
+    color: #bdbdbd;
+
+    font-size: 11px;
+    line-height: 1.5;
+}
+
+
+.settings-menu-button {
+    width: 100%;
+
+    margin-top: 7px;
+    padding: 9px;
+
+    background:
+    var(--ui-button);
+
+    border:
+    2px solid
+    var(--ui-border-dark);
+
+    color:
+    var(--ui-text);
+
+    font-family: monospace;
+
+    cursor: pointer;
+}
+
+
+.settings-menu-button:hover {
+    background:
+        var(--ui-button-hover);
+}
+
+
+.settings-menu-button:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+/* =========================================================
+   SETTLEMENT NAME WINDOW
+   ========================================================= */
+
+#settlement-name-overlay {
+    position: fixed;
+
+    inset: 0;
+
+    display: none;
+    align-items: center;
+    justify-content: center;
+
+    background: rgba(0, 0, 0, 0.7);
+
+    z-index: 1100;
+}
+
+
+#settlement-name-overlay.open {
+    display: flex;
+}
+
+
+#settlement-name-menu {
+    width: 340px;
+
+    padding: 14px;
+
+    background:
+        var(--ui-base);
+
+    border:
+        3px solid
+        var(--ui-border-dark);
+
+    box-shadow:
+        inset 1px 1px 0
+            var(--ui-border-light),
+
+        inset -1px -1px 0
+            var(--ui-border-dark);
+
+    color:
+        var(--ui-text);
+
+    font-family: monospace;
+}
+
+
+.name-description {
+    margin-bottom: 10px;
+
+    color: #bdbdbd;
+
+    font-size: 11px;
+}
+
+
+#settlement-name-input {
+    width: 100%;
+
+    margin-bottom: 8px;
+
+    padding: 9px;
+
+    background: #151515;
+
+    border: 2px solid #444;
+
+    outline: none;
+
+    color: white;
+
+    font-family: monospace;
+}
+
+
+#settlement-name-input:focus {
+    border-color: #888;
+}
+
+/* =========================================================
+   BUILDING INFO POPUP
+   ========================================================= */
+
+#building-info-popup {
+    position: absolute;
+
+    display: none;
+
+    min-width: 190px;
+    max-width: 260px;
+
+    padding: 8px;
+
+    background: rgba(25, 25, 25, 0.96);
+
+    border: 2px solid #111;
+
+    box-shadow:
+        inset 1px 1px 0 #555,
+        inset -1px -1px 0 #111;
+
+    color: white;
+
+    font-family: monospace;
+    font-size: 11px;
+
+    line-height: 1.6;
+
+    z-index: 50;
+
+    pointer-events: none;
+}
+
+
+#building-info-popup.open {
+    display: block;
+}
+
+
+#building-info-title {
+    margin-bottom: 6px;
+    padding-bottom: 5px;
+
+    border-bottom: 1px solid #555;
+
+    font-size: 13px;
+    font-weight: bold;
+}
+
+
+.building-info-resident {
+    color: #d8d8d8;
+}
+
+.building-info-family {
+    margin-top: 8px;
+}
+
+.building-info-family-name {
+    margin-bottom: 3px;
+
+    color: #ffffff;
+
+    font-weight: bold;
+}
+
+.building-info-resident {
+    padding-left: 8px;
+
+    color: #d8d8d8;
+}
+
+.building-info-relation {
+    color: #999999;
+}
+
+/* =========================================================
+   TIME CONTROLS
+   ========================================================= */
+
+.time-controls {
+    display: grid;
+
+    grid-template-columns:
+        repeat(3, 1fr);
+
+    gap: 4px;
+
+    margin-top: 8px;
+}
+
+
+#time-pause-button {
+    grid-column:
+        1 / -1;
+}
+
+
+.time-control-button {
+    min-width: 0;
+
+    padding: 5px 3px;
+
+    background:
+    var(--ui-button);
+
+    border:
+    2px solid
+    var(--ui-border-dark);
+
+    color:
+        var(--ui-text);
+
+    font-family: monospace;
+    font-size: 10px;
+
+    cursor: pointer;
+}
+
+
+.time-control-button:hover {
+    background:
+        var(--ui-button-hover);
+}
+
+
+.time-control-button.active {
+    background: #666;
+
+    border-color: #999;
+
+    color: white;
+}
+
+/* =========================================================
+   PEOPLE MENU
+   ========================================================= */
+
+#people-menu-layer {
+    position: fixed;
+
+    inset: 0;
+
+    display: none;
+
+    z-index: 900;
+
+    pointer-events: none;
+}
+
+
+#people-menu-layer.open {
+    display: block;
+}
+
+
+#people-menu {
+    position: absolute;
+
+    top: auto;
+    left: auto;
+
+    right: 0;
+    bottom: 100px;
+
+    transform: none;
+
+    width: min(
+        460px,
+        calc(100vw - 40px)
+    );
+
+    max-height: min(
+        620px,
+        calc(100vh - 120px)
+    );
+
+    display: flex;
+    flex-direction: column;
+
+    padding: 12px;
+
+    background:
+    var(--ui-base);
+
+    border:
+    3px solid
+    var(--ui-border-dark);
+
+    box-shadow:
+        inset 1px 1px 0
+            var(--ui-border-light),
+
+        inset -1px -1px 0
+            var(--ui-border-dark);
+
+    color:
+        var(--ui-text);
+
+    font-family: monospace;
+
+    pointer-events: auto;
+}
+
+
+.people-menu-header {
+    display: grid;
+
+    grid-template-columns:
+        70px
+        1fr
+        70px;
+
+    align-items: center;
+
+    gap: 8px;
+
+    margin-bottom: 10px;
+}
+
+
+#people-menu-title {
+    padding: 9px;
+
+    background: #151515;
+
+    border: 2px solid #444;
+
+    text-align: center;
+
+    font-size: 15px;
+    font-weight: bold;
+}
+
+
+.people-menu-header-button {
+    height: 34px;
+
+    background:
+        var(--ui-button);
+
+    border:
+    2px solid
+    var(--ui-border-dark);
+
+    color:
+    var(--ui-text);
+
+    font-family: monospace;
+    font-size: 11px;
+
+    cursor: pointer;
+}
+
+
+.people-menu-header-button:hover {
+    background:
+        var(--ui-button-hover);
+}
+
+
+#people-menu-search-wrap {
+    margin-bottom: 10px;
+}
+
+
+#people-menu-search {
+    width: 100%;
+
+    padding: 9px;
+
+    background: #151515;
+
+    border: 2px solid #444;
+
+    outline: none;
+
+    color: white;
+
+    font-family: monospace;
+}
+
+
+#people-menu-search:focus {
+    border-color: #888;
+}
+
+
+#people-menu-content {
+    min-height: 120px;
+
+    overflow-y: auto;
+
+    padding-right: 3px;
+}
+
+
+.people-list-entry {
+    width: 100%;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    gap: 12px;
+
+    margin-bottom: 6px;
+    padding: 10px;
+
+    background: #303030;
+
+    border: 2px solid #161616;
+
+    color: white;
+
+    font-family: monospace;
+
+    text-align: left;
+
+    cursor: pointer;
+}
+
+
+.people-list-entry:hover {
+    background: #414141;
+}
+
+
+.people-entry-name {
+    font-weight: bold;
+}
+
+
+.people-entry-secondary {
+    color: #aaa;
+
+    font-size: 10px;
+
+    text-align: right;
+}
+
+
+.people-info-section {
+    margin-bottom: 12px;
+    padding: 10px;
+
+    background: #1c1c1c;
+
+    border: 1px solid #444;
+
+    font-size: 11px;
+
+    line-height: 1.8;
+}
+
+
+.people-info-label {
+    color: #999;
+}
+
+
+.people-menu-empty {
+    padding: 20px;
+
+    color: #999;
+
+    text-align: center;
+
+    font-size: 11px;
+}
+
+
+/* =========================================================
+   ECONOMY MENU
+   ========================================================= */
+
+#economy-menu-layer {
+    position: fixed;
+
+    inset: 0;
+
+    display: none;
+
+    z-index: 900;
+
+    pointer-events: none;
+}
+
+
+#economy-menu-layer.open {
+    display: block;
+}
+
+
+#economy-menu {
+    position: absolute;
+
+    right: 0;
+    bottom: 100px;
+
+    width: min(
+        460px,
+        calc(100vw - 40px)
+    );
+
+    max-height: min(
+        620px,
+        calc(100vh - 120px)
+    );
+
+    display: flex;
+    flex-direction: column;
+
+    padding: 12px;
+
+    background:
+        var(--ui-base);
+
+    border:
+        3px solid
+        var(--ui-border-dark);
+
+    box-shadow:
+        inset 1px 1px 0
+            var(--ui-border-light),
+
+        inset -1px -1px 0
+            var(--ui-border-dark);
+
+    color:
+        var(--ui-text);
+
+    font-family: monospace;
+
+    pointer-events: auto;
+}
+
+
+#economy-menu-title {
+    padding: 9px;
+
+    background: #151515;
+
+    border: 2px solid #444;
+
+    text-align: center;
+
+    font-size: 15px;
+    font-weight: bold;
+}
+
+
+#economy-menu-content {
+    overflow-y: auto;
+}
+
+
+.economy-resource {
+    margin-bottom: 8px;
+    padding: 10px;
+
+    background: #1c1c1c;
+
+    border: 1px solid #444;
+
+    font-size: 11px;
+
+    line-height: 1.9;
+}
+
+
+.economy-resource-title {
+    margin-bottom: 5px;
+    padding-bottom: 4px;
+
+    border-bottom: 1px solid #444;
+
+    font-size: 13px;
+    font-weight: bold;
+}
+
+
+.economy-positive {
+    color: #9ddd8a;
+}
+
+
+.economy-negative {
+    color: #e09a8a;
+}
+
+/* =========================================================
+   RPG STEP 1
+   ========================================================= */
+
+.rpg-controls-section {
+    margin-top: 0;
+}
+
+.rpg-controls-section .ui-placeholder {
+    color: var(--ui-text-muted);
+}
+
+
+/* =========================================================
+   RPG INTERACTION MENU
+   ========================================================= */
+
+#interaction-menu {
+    position: absolute;
+
+    display: none;
+
+    min-width: 130px;
+
+    padding: 4px;
+
+    background:
+        var(--ui-base);
+
+    border-top:
+        2px solid
+        var(--ui-border-light);
+
+    border-left:
+        2px solid
+        var(--ui-border-light);
+
+    border-right:
+        2px solid
+        var(--ui-border-dark);
+
+    border-bottom:
+        2px solid
+        var(--ui-border-dark);
+
+    color:
+        var(--ui-text);
+
+    font-family:
+        monospace;
+
+    font-size:
+        11px;
+
+    z-index:
+        200;
+
+    user-select:
+        none;
+}
+
+
+#interaction-menu.open {
+    display:
+        block;
+}
+
+
+#interaction-menu-title {
+    padding:
+        4px 6px;
+
+    margin-bottom:
+        4px;
+
+    background:
+        var(--ui-dark);
+
+    font-weight:
+        bold;
+}
+
+
+.interaction-menu-button {
+    width:
+        100%;
+
+    padding:
+        6px 10px;
+
+    background:
+        var(--ui-button);
+
+    border-top:
+        1px solid
+        var(--ui-border-light);
+
+    border-left:
+        1px solid
+        var(--ui-border-light);
+
+    border-right:
+        1px solid
+        var(--ui-border-dark);
+
+    border-bottom:
+        1px solid
+        var(--ui-border-dark);
+
+    color:
+        var(--ui-text);
+
+    font-family:
+        monospace;
+
+    font-size:
+        11px;
+
+    text-align:
+        left;
+
+    cursor:
+        pointer;
+}
+
+
+.interaction-menu-button:hover {
+    background:
+        var(--ui-button-hover);
+}
+
+
+.interaction-menu-message {
+    padding:
+        5px 7px;
+
+    color:
+        var(--ui-text-muted);
+}
+
+/* =========================================================
+   INVENTORY MENU
+   ========================================================= */
+
+#inventory-menu-layer {
+    position: fixed;
+
+    inset: 0;
+
+    display: none;
+
+    z-index: 900;
+
+    pointer-events: none;
+}
+
+
+#inventory-menu-layer.open {
+    display: block;
+}
+
+
+#inventory-menu {
+    position: absolute;
+
+    right: 0;
+    bottom: 100px;
+
+    width: min(
+        460px,
+        calc(100vw - 40px)
+    );
+
+    max-height: min(
+        620px,
+        calc(100vh - 120px)
+    );
+
+    display: flex;
+    flex-direction: column;
+
+    padding: 12px;
+
+    background:
+        var(--ui-base);
+
+    border:
+        3px solid
+        var(--ui-border-dark);
+
+    box-shadow:
+        inset 1px 1px 0
+            var(--ui-border-light),
+
+        inset -1px -1px 0
+            var(--ui-border-dark);
+
+    color:
+        var(--ui-text);
+
+    font-family:
+        monospace;
+
+    pointer-events:
+        auto;
+}
+
+
+#inventory-menu-title {
+    padding: 9px;
+
+    background:
+        var(--ui-dark);
+
+    border:
+        2px solid
+        var(--ui-border-dark);
+
+    text-align:
+        center;
+
+    font-size:
+        15px;
+
+    font-weight:
+        bold;
+}
+
+
+#inventory-menu-content {
+    min-height: 120px;
+
+    overflow-y: auto;
+}
+
+
+.inventory-empty {
+    padding: 20px;
+
+    color:
+        var(--ui-text-muted);
+
+    text-align:
+        center;
+
+    font-size:
+        11px;
+}
+
+
+.inventory-item {
+    width: 100%;
+
+    display: flex;
+
+    justify-content:
+        space-between;
+
+    align-items:
+        center;
+
+    gap: 12px;
+
+    margin-bottom: 6px;
+
+    padding: 10px;
+
+    background:
+        var(--ui-dark);
+
+    border-top:
+        1px solid
+        var(--ui-border-light);
+
+    border-left:
+        1px solid
+        var(--ui-border-light);
+
+    border-right:
+        1px solid
+        var(--ui-border-dark);
+
+    border-bottom:
+        1px solid
+        var(--ui-border-dark);
+
+    color:
+        var(--ui-text);
+
+    font-family:
+        monospace;
+
+    font-size:
+        11px;
+}
+
+
+.inventory-item-name {
+    font-weight:
+        bold;
+}
+
+
+.inventory-item-amount {
+    color:
+        var(--ui-text-muted);
+}
+
+.inventory-item {
+    cursor: pointer;
+    text-align: left;
+}
+
+
+.inventory-item:hover {
+    background:
+        var(--ui-button-hover);
+}
+
+
+.inventory-info-section {
+    margin-bottom: 8px;
+
+    padding: 10px;
+
+    background:
+        var(--ui-dark);
+
+    border-top:
+        1px solid
+        var(--ui-border-light);
+
+    border-left:
+        1px solid
+        var(--ui-border-light);
+
+    border-right:
+        1px solid
+        var(--ui-border-dark);
+
+    border-bottom:
+        1px solid
+        var(--ui-border-dark);
+
+    font-size: 11px;
+
+    line-height: 1.8;
+}
+
+
+.inventory-info-name {
+    margin-bottom: 5px;
+
+    font-weight: bold;
+}
+
+
+.inventory-info-description {
+    color:
+        var(--ui-text-muted);
+}
+
+
+.inventory-info-label {
+    color:
+        var(--ui-text-muted);
+}
+
+
+.inventory-action-button {
+    width: 100%;
+
+    padding: 7px;
+
+    background:
+        var(--ui-button);
+
+    border-top:
+        2px solid
+        var(--ui-border-light);
+
+    border-left:
+        2px solid
+        var(--ui-border-light);
+
+    border-right:
+        2px solid
+        var(--ui-border-dark);
+
+    border-bottom:
+        2px solid
+        var(--ui-border-dark);
+
+    color:
+        var(--ui-text);
+
+    font-family:
+        monospace;
+
+    cursor:
+        pointer;
+}
+
+
+.inventory-action-button:hover {
+    background:
+        var(--ui-button-hover);
+}
+
+/* =========================================================
+   CHARACTER MENU
+   ========================================================= */
+
+#character-menu-layer {
+    position: fixed;
+
+    inset: 0;
+
+    display: none;
+
+    z-index: 900;
+
+    pointer-events: none;
+}
+
+
+#character-menu-layer.open {
+    display: block;
+}
+
+
+#character-menu {
+    position: absolute;
+
+    right: 0;
+    bottom: 100px;
+
+    width: min(
+        460px,
+        calc(100vw - 40px)
+    );
+
+    max-height: min(
+        620px,
+        calc(100vh - 120px)
+    );
+
+    display: flex;
+    flex-direction: column;
+
+    padding: 12px;
+
+    background:
+        var(--ui-base);
+
+    border:
+        3px solid
+        var(--ui-border-dark);
+
+    box-shadow:
+        inset 1px 1px 0
+            var(--ui-border-light),
+
+        inset -1px -1px 0
+            var(--ui-border-dark);
+
+    color:
+        var(--ui-text);
+
+    font-family:
+        monospace;
+
+    pointer-events:
+        auto;
+}
+
+
+#character-menu-title {
+    padding: 9px;
+
+    background:
+        var(--ui-dark);
+
+    border:
+        2px solid
+        var(--ui-border-dark);
+
+    text-align:
+        center;
+
+    font-size:
+        15px;
+
+    font-weight:
+        bold;
+}
+
+
+#character-menu-content {
+    min-height: 120px;
+
+    overflow-y: auto;
+}
+
+
+.character-section {
+    margin-bottom: 8px;
+
+    padding: 10px;
+
+    background:
+        var(--ui-dark);
+
+    border-top:
+        1px solid
+        var(--ui-border-light);
+
+    border-left:
+        1px solid
+        var(--ui-border-light);
+
+    border-right:
+        1px solid
+        var(--ui-border-dark);
+
+    border-bottom:
+        1px solid
+        var(--ui-border-dark);
+
+    font-size: 11px;
+
+    line-height: 1.8;
+}
+
+
+.character-section-title {
+    margin-bottom: 6px;
+
+    padding-bottom: 4px;
+
+    border-bottom:
+        1px solid
+        var(--ui-border-dark);
+
+    font-size: 12px;
+
+    font-weight: bold;
+}
+
+
+.character-label {
+    color:
+        var(--ui-text-muted);
+}
+
+
+.character-value {
+    float: right;
+
+    color:
+        var(--ui-text);
+}
+
+/* =========================================================
+   DISABLED RPG INTERACTION
+   ========================================================= */
+
+.interaction-menu-button:disabled {
+    opacity: 0.45;
+    cursor: default;
+}
+
+.interaction-menu-button:disabled:hover {
+    background:
+        var(--ui-button);
+}
+
+/* =========================================================
+   RPG TRADE
+   ========================================================= */
+
+#interaction-menu.trade-view {
+    min-width: 300px;
+    max-width: 360px;
+}
+
+
+.trade-wallets {
+    margin-bottom: 8px;
+    padding: 7px;
+
+    background:
+        var(--ui-dark);
+
+    color:
+        var(--ui-text-muted);
+
+    line-height: 1.6;
+}
+
+
+.trade-section {
+    margin-bottom: 8px;
+}
+
+
+.trade-section-title {
+    margin-bottom: 4px;
+    padding: 4px 6px;
+
+    border-bottom:
+        1px solid
+        var(--ui-border-dark);
+
+    font-weight: bold;
+}
+
+
+.trade-item-button {
+    display: flex;
+
+    align-items: center;
+    justify-content: space-between;
+
+    gap: 14px;
+}

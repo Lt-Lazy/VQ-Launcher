@@ -1,0 +1,628 @@
+* {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    margin: 0;
+    padding: 0;
+
+    width: 100%;
+    height: 100%;
+
+    overflow: hidden;
+
+    background: #080808;
+
+    font-family:
+        "Courier New",
+        monospace;
+
+    color: #d8ffd8;
+}
+
+
+/* =========================================================
+   MAIN LAYOUT
+========================================================= */
+
+#gameShell {
+    display: flex;
+
+    width: 100vw;
+    height: 100vh;
+
+    background: #090909;
+}
+
+
+/* =========================================================
+   SIDEBAR
+========================================================= */
+
+#sidebar {
+    width: 190px;
+    min-width: 190px;
+
+    height: 100%;
+
+    padding: 8px;
+
+    background: #171917;
+
+    border-right: 2px solid #384638;
+
+    display: flex;
+    flex-direction: column;
+
+    gap: 8px;
+}
+
+
+#gameTitle {
+    padding: 12px 8px;
+
+    text-align: center;
+
+    color: #aaff88;
+
+    background: #101510;
+
+    border: 1px solid #577057;
+
+    font-weight: bold;
+
+    font-size: 15px;
+}
+
+
+.sidebarSection {
+    border: 1px solid #364536;
+
+    background: #111511;
+}
+
+
+.sectionTitle {
+    padding: 6px 8px;
+
+    color: #c8ffc8;
+
+    background: #202720;
+
+    border-bottom: 1px solid #364536;
+
+    font-weight: bold;
+
+    font-size: 12px;
+}
+
+
+.sidebarContent {
+    padding: 8px;
+
+    font-size: 11px;
+
+    line-height: 18px;
+
+    color: #9fd89f;
+}
+
+
+/* =========================================================
+   MAIN AREA
+========================================================= */
+
+#mainArea {
+    flex: 1;
+
+    min-width: 0;
+
+    height: 100%;
+
+    display: flex;
+
+    flex-direction: column;
+}
+
+
+/* =========================================================
+   GAME VIEWPORT
+========================================================= */
+
+#gameViewport {
+    position: relative;
+
+    flex: 1;
+
+    min-height: 0;
+
+    overflow: hidden;
+
+    background: #000;
+}
+
+
+#gameCanvas {
+    display: block;
+
+    width: 100%;
+    height: 100%;
+
+    background: #000;
+
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+}
+
+
+/* =========================================================
+   DEBUG
+========================================================= */
+
+#debugPanel {
+    position: absolute;
+
+    top: 8px;
+    left: 8px;
+
+    padding: 6px 8px;
+
+    color: #6cff6c;
+
+    background: rgba(0, 0, 0, 0.86);
+
+    border: 1px solid #356835;
+
+    font-size: 11px;
+
+    line-height: 17px;
+
+    pointer-events: none;
+
+    user-select: none;
+
+    z-index: 10;
+}
+
+
+/* =========================================================
+   TOOLBAR
+========================================================= */
+
+#toolbar {
+    height: 92px;
+    min-height: 92px;
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 18px;
+
+    padding: 10px 16px;
+
+    background: #1a1d1a;
+
+    border-top: 2px solid #384638;
+}
+
+
+#toolbarTitle {
+    width: 90px;
+
+    text-align: center;
+
+    color: #b8ff8c;
+
+    font-size: 12px;
+
+    font-weight: bold;
+}
+
+
+#toolbarButtons {
+    display: flex;
+
+    align-items: center;
+
+    gap: 8px;
+}
+
+
+.toolbarButton {
+    min-width: 76px;
+    height: 54px;
+
+    padding: 6px 10px;
+
+    background: #242b24;
+
+    color: #d6ffd6;
+
+    border: 1px solid #647564;
+
+    font-family:
+        "Courier New",
+        monospace;
+
+    font-size: 11px;
+
+    cursor: pointer;
+}
+
+
+.toolbarButton:hover {
+    background: #354035;
+
+    color: #ffffff;
+}
+
+
+/* =========================================================
+   CONTEXT MENU
+========================================================= */
+
+#contextMenu {
+    position: absolute;
+
+    min-width: 140px;
+
+    padding: 4px;
+
+    background: #050505;
+
+    border: 1px solid #54ff54;
+
+    color: #8cff8c;
+
+    font-family:
+        "Courier New",
+        monospace;
+
+    font-size: 12px;
+
+    z-index: 100;
+
+    user-select: none;
+
+    box-shadow:
+        2px 2px 0 #001b00;
+}
+
+
+#contextMenu.hidden {
+    display: none;
+}
+
+
+#contextTitle {
+    padding: 5px 7px;
+
+    color: #d4ffd4;
+
+    border-bottom: 1px solid #315831;
+
+    margin-bottom: 3px;
+
+    font-weight: bold;
+}
+
+
+.context-action {
+    display: block;
+
+    width: 100%;
+
+    padding: 5px 7px;
+
+    border: none;
+
+    background: transparent;
+
+    color: #71ff71;
+
+    text-align: left;
+
+    font-family:
+        "Courier New",
+        monospace;
+
+    font-size: 12px;
+
+    cursor: pointer;
+}
+
+
+.context-action:hover {
+    background: #173117;
+
+    color: #ffffff;
+}
+
+/* =========================================================
+   GAME WINDOWS
+========================================================= */
+
+.gameWindow {
+    position: absolute;
+
+    top: 50px;
+    right: 20px;
+
+    width: 260px;
+
+    background: #101510;
+
+    border: 2px solid #526852;
+
+    color: #d6ffd6;
+
+    z-index: 80;
+
+    box-shadow:
+        4px 4px 0 rgba(0, 0, 0, 0.6);
+}
+
+
+.gameWindow.hidden {
+    display: none;
+}
+
+
+.windowHeader {
+    height: 32px;
+
+    padding-left: 9px;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    background: #242c24;
+
+    border-bottom: 1px solid #526852;
+
+    color: #caffaa;
+
+    font-size: 12px;
+
+    font-weight: bold;
+}
+
+
+.windowCloseButton {
+    width: 31px;
+    height: 31px;
+
+    border: none;
+    border-left: 1px solid #526852;
+
+    background: #1b211b;
+
+    color: #d6ffd6;
+
+    font-family:
+        "Courier New",
+        monospace;
+
+    cursor: pointer;
+}
+
+
+.windowCloseButton:hover {
+    background: #394539;
+
+    color: #ffffff;
+}
+
+
+.windowContent {
+    padding: 10px;
+}
+
+
+.inventoryRow {
+    display: flex;
+
+    justify-content: space-between;
+
+    padding: 6px 5px;
+
+    border-bottom: 1px solid #293529;
+
+    font-size: 12px;
+}
+
+
+.inventoryRow:last-child {
+    border-bottom: none;
+}
+
+/* =========================================================
+   INVENTORY
+========================================================= */
+
+#inventoryWindow {
+    width: 300px;
+    height: 360px;
+
+    display: flex;
+    flex-direction: column;
+
+    overflow: hidden;
+}
+
+
+/* Hidden må fortsatt slå av display */
+
+#inventoryWindow.hidden {
+    display: none;
+}
+
+
+/* Header skal aldri krympe */
+
+#inventoryWindow .windowHeader {
+    flex-shrink: 0;
+}
+
+
+/* =========================================================
+   INVENTORY LIST
+========================================================= */
+
+#inventoryList {
+    flex: 1;
+
+    min-height: 0;
+
+    overflow-y: auto;
+    overflow-x: hidden;
+
+    padding: 6px;
+
+    background: #0d110d;
+
+    scrollbar-width: thin;
+    scrollbar-color:
+        #526852
+        #101510;
+}
+
+
+/* Chrome / Edge scrollbar */
+
+#inventoryList::-webkit-scrollbar {
+    width: 10px;
+}
+
+
+#inventoryList::-webkit-scrollbar-track {
+    background: #101510;
+}
+
+
+#inventoryList::-webkit-scrollbar-thumb {
+    background: #526852;
+
+    border: 2px solid #101510;
+}
+
+
+#inventoryList::-webkit-scrollbar-thumb:hover {
+    background: #708870;
+}
+
+
+/* =========================================================
+   INVENTORY ITEM
+========================================================= */
+
+.inventoryItem {
+    display: flex;
+
+    align-items: center;
+    justify-content: space-between;
+
+    min-height: 28px;
+
+    padding: 5px 7px;
+
+    border-bottom: 1px solid #273127;
+
+    color: #d4ffd4;
+
+    font-size: 12px;
+}
+
+
+.inventoryItem:last-child {
+    border-bottom: none;
+}
+
+
+.inventoryItem:hover {
+    background: #182018;
+}
+
+
+.inventoryItemName {
+    overflow: hidden;
+
+    white-space: nowrap;
+
+    text-overflow: ellipsis;
+}
+
+
+.inventoryItemAmount {
+    flex-shrink: 0;
+
+    margin-left: 12px;
+
+    color: #8cff8c;
+}
+
+
+.inventoryEmpty {
+    padding: 12px 8px;
+
+    text-align: center;
+
+    color: #637563;
+
+    font-size: 11px;
+}
+
+/* =========================================================
+   HEALTH
+========================================================= */
+
+.healthValue {
+    display: inline-block;
+
+    min-width: 32px;
+
+    margin-left: 3px;
+
+    padding: 1px 4px;
+
+    text-align: center;
+
+    color: #000;
+
+    font-weight: bold;
+
+    border: 1px solid rgba(0, 0, 0, 0.6);
+}
+
+
+/* High health */
+
+.health-green {
+    background: #43d143;
+}
+
+
+/* Medium health */
+
+.health-yellow {
+    background: #e6db45;
+}
+
+
+/* Low health */
+
+.health-orange {
+    background: #e89532;
+}
+
+
+/* Critical health */
+
+.health-red {
+    background: #d9473f;
+
+    color: #fff;
+}

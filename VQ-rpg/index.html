@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>VQ RPG</title>
+
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <div id="gameShell">
+
+        <!-- =========================
+             LEFT SIDEBAR
+        ========================== -->
+
+        <aside id="sidebar">
+
+            <div id="gameTitle">
+                VQ RPG
+            </div>
+
+            <div class="sidebarSection">
+
+                <div class="sectionTitle">
+                    Character
+                </div>
+
+                <div class="sidebarContent">
+
+                    <div>Name: Adventurer</div>
+
+                    <div class="characterStat">
+                        Health:
+                        <span id="playerHealth" class="healthValue">
+                            100
+                        </span>
+                    </div>
+
+                    <div>Hunger: --</div>
+
+                </div>
+
+            </div>
+
+
+            <div class="sidebarSection">
+
+                <div class="sectionTitle">
+                    World
+                </div>
+
+                <div class="sidebarContent">
+
+                    <div id="sidebarPosition">
+                        X: 0 Y: 0
+                    </div>
+
+                </div>
+
+            </div>
+
+        </aside>
+
+
+        <!-- =========================
+             RIGHT SIDE
+        ========================== -->
+
+        <main id="mainArea">
+
+            <!-- GAME -->
+
+            <div id="gameViewport">
+
+                <canvas id="gameCanvas"></canvas>
+
+
+                <div id="debugPanel">
+
+                    <div id="mapName">
+                        Loading world...
+                    </div>
+
+                    <div id="playerPosition">
+                        X: 0 Y: 0
+                    </div>
+
+                </div>
+
+
+                <!-- CONTEXT MENU -->
+
+                <div id="contextMenu" class="hidden">
+
+                    <div id="contextTitle">
+                        Object
+                    </div>
+
+                    <div id="contextActions"></div>
+
+                </div>
+
+                <!-- INVENTORY WINDOW -->
+
+                <div id="inventoryWindow" class="gameWindow hidden">
+
+                    <div class="windowHeader">
+
+                        <span>Inventory</span>
+
+                        <button
+                            id="closeInventoryButton"
+                            class="windowCloseButton"
+                        >
+                            X
+                        </button>
+
+                    </div>
+
+
+                    <div id="inventoryList">
+
+                        <div class="inventoryEmpty">
+                            Inventory is empty.
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <!-- =========================
+                 TOOLBAR
+            ========================== -->
+
+            <div id="toolbar">
+
+                <div id="toolbarTitle">
+                    Toolbar
+                </div>
+
+                <div id="toolbarButtons">
+
+                    <button
+                        id="inventoryButton"
+                        class="toolbarButton"
+                    >
+                        Inventory
+                    </button>
+
+                </div>
+
+            </div>
+
+        </main>
+
+    </div>
+
+    <script src="items.js"></script>
+    <script src="enemies.js"></script>
+    <script src="script.js"></script>
+
+</body>
+</html>

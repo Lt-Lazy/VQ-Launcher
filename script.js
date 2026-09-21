@@ -25,44 +25,44 @@
 
 const games = [
 
-    /*
+    
 
     {
-        id: "vq-dungeons",
+        id: "vq-rpg",
 
-        title: "VQ Dungeons",
+        title: "VQ RPG",
 
-        shortTitle: "D",
+        shortTitle: "VQRPG",
 
-        status: "PROJECT PAUSED",
+        status: "IN DEVELOPMENT",
 
         type: "OPEN WORLD RPG",
 
         description:
             "A retro open world adventure with exploration, dungeons, combat and old-school RPG mechanics.",
 
-        path: "./vq-dungeons/",
+        path: "./VQ-rpg/",
 
         image: "",
 
-        featured: false,
+        featured: true,
 
         tags: [
-            "3D/2D",
+            "2D",
             "PIXEL ART",
             "RPG",
             "DUNGEON CRAWLER",
             "ADVENTURE"
         ]
     },
-    */
+    
 
     {
         id: "vq-settlement",
 
         title: "VQ Settlement",
 
-        shortTitle: "S",
+        shortTitle: "Colony",
 
         status: "IN DEVELOPMENT",
 
@@ -75,13 +75,13 @@ const games = [
 
         image: "",
 
-        featured: true,
+        featured: false,
 
         tags: [
             "2D",
             "PIXEL ART",
             "SIMULATION",
-            "RPG"
+            "colony"
         ]
     }
 
@@ -97,6 +97,17 @@ const games = [
 
 
 const news = [
+
+    {
+        date: "21 SEP 2026, 01:51 (UTC+2)",
+
+        game: "Void Quest RPG",
+
+        title: "New RPG in the works",
+
+        text:
+            "Another branch of the VQ world has been made. Welcome to the development of VQ-RPG! We will just call it that for now, and find a real name later. This is a game that is supposed to attract those who are more interested in a rpg experience, where you make your own character, adventure, where every choice and path matters, where you can go from peasant to king. Every thing is up to you. And as always, we are trying to keep the graphics low, or better said, we are trying to keep the focus on details, mechanics, relations, worldbuilding and make an overal better experience for the players that like endless content. And the game will of course be playable while we code and develope it! "
+    },
 
     {
         date: "19 AUG 2026, 22:44 (UTC+2)",

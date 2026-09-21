@@ -67,6 +67,79 @@ const playerHealthDisplay =
         "playerHealth"
     );
 
+const gameLog =
+    document.getElementById(
+        "gameLog"
+    );
+
+// ============================================================
+// GAME LOG
+// ============================================================
+
+const MAX_LOG_ENTRIES = 60;
+
+
+function addGameLog(
+    message,
+    type = "normal"
+) {
+
+    if (!gameLog) {
+
+        return;
+
+    }
+
+
+    const entry =
+        document.createElement(
+            "div"
+        );
+
+
+    entry.className =
+        "logEntry";
+
+
+    if (
+        type !== "normal"
+    ) {
+
+        entry.classList.add(
+            `log-${type}`
+        );
+
+    }
+
+
+    entry.textContent =
+        message;
+
+
+    // Newest message goes at the top.
+    gameLog.prepend(
+        entry
+    );
+
+
+    // Remove the oldest message
+    // when the log exceeds the limit.
+
+    while (
+        gameLog.children.length >
+        MAX_LOG_ENTRIES
+    ) {
+
+        gameLog.removeChild(
+            gameLog.lastChild
+        );
+
+    }
+
+
+    gameLog.scrollTop = 0;
+}
+
 // ============================================================
 // SETTINGS
 // ============================================================
@@ -115,6 +188,10 @@ const player = {
 
     health: 100,
     maxHealth: 100,
+
+    unarmedDamage: 2,
+
+    damageFlashUntil: 0,
 
     image: new Image(),
 
@@ -1491,6 +1568,51 @@ function movePlayer(
 
     updateUI();
 
+
+    // Player used one turn.
+    // Enemies now get their turn.
+
+    runEnemyTurn();
+
+}
+
+// ============================================================
+// DAMAGE FLASH
+// ============================================================
+
+function drawDamageFlash(
+    damageFlashUntil,
+    screenX,
+    screenY,
+    tileWidth,
+    tileHeight
+) {
+
+    if (
+        performance.now() >=
+        damageFlashUntil
+    ) {
+
+        return;
+    }
+
+
+    ctx.save();
+
+
+    ctx.fillStyle =
+        "rgba(255, 0, 0, 0.45)";
+
+
+    ctx.fillRect(
+        screenX,
+        screenY,
+        tileWidth,
+        tileHeight
+    );
+
+
+    ctx.restore();
 }
 
 // ============================================================
@@ -1763,6 +1885,15 @@ function drawEnemies(
                 tileHeight
             );
         }
+
+        drawDamageFlash(
+            enemy.damageFlashUntil,
+            screenX,
+            screenY,
+            tileWidth,
+            tileHeight
+        );
+
     }
 }
 
@@ -1844,7 +1975,8 @@ function updateHealthUI() {
 }
 
 function damagePlayer(
-    amount
+    amount,
+    source = null
 ) {
 
     if (
@@ -1872,11 +2004,30 @@ function damagePlayer(
 
     updateHealthUI();
 
+    player.damageFlashUntil =
+        performance.now() + 180;
 
     console.log(
         `Player took ${amount} damage.`
     );
 
+    if (
+        source
+    ) {
+
+        addGameLog(
+            `${source} attacks you for ${amount} damage.`,
+            "danger"
+        );
+
+    } else {
+
+        addGameLog(
+            `You take ${amount} damage.`,
+            "danger"
+        );
+
+    }
 
     if (
         player.health === 0
@@ -1922,12 +2073,24 @@ function healPlayer(
     console.log(
         `Player healed ${amount} health.`
     );
+
+    addGameLog(
+        `You recover ${amount} health.`,
+        "success"
+    );
+
 }
 
 function playerDied() {
 
     console.log(
         "Player has died."
+    );
+
+
+    addGameLog(
+        "You have died.",
+        "danger"
     );
 
 }
@@ -2159,7 +2322,28 @@ function loadEnemiesFromMap() {
                     definition.maxHealth,
 
                 alive:
-                    true
+                    true,
+
+                aggro:
+                    false,
+
+                returningHome:
+                    false,
+
+                damageFlashUntil:
+                    0,
+
+                homeX:
+                    Math.floor(
+                        object.x /
+                        tileWidth
+                    ),
+
+                homeY:
+                    Math.floor(
+                        object.y /
+                        tileHeight
+                    )
 
             };
 
@@ -2211,6 +2395,653 @@ function getEnemyAt(
 
 
     return null;
+}
+
+// ============================================================
+// PLAYER ATTACK ENEMY
+// ============================================================
+
+function attackEnemy(
+    enemy
+) {
+
+    if (
+        !enemy ||
+        !enemy.alive
+    ) {
+
+        closeContextMenu();
+
+        return;
+    }
+
+
+    const definition =
+        window.ENEMY_TYPES[
+            enemy.type
+        ];
+
+
+    if (!definition) {
+
+        closeContextMenu();
+
+        return;
+    }
+
+
+    // ========================================================
+    // MUST BE NEXT TO ENEMY
+    // ========================================================
+
+    if (
+        !isPlayerAdjacentTo(
+            enemy.x,
+            enemy.y
+        )
+    ) {
+
+        addGameLog(
+            `${definition.name} is too far away to attack.`,
+            "combat"
+        );
+
+
+        closeContextMenu();
+
+        return;
+    }
+
+
+    // ========================================================
+    // ATTACK
+    // ========================================================
+
+    const damage =
+        player.unarmedDamage;
+
+
+    enemy.health -=
+        damage;
+
+    enemy.damageFlashUntil =
+        performance.now() + 180;
+
+    if (
+        enemy.health < 0
+    ) {
+
+        enemy.health = 0;
+
+    }
+
+
+    // Attacking the enemy causes aggro.
+
+    enemy.aggro =
+        true;
+
+
+    enemy.returningHome =
+        false;
+
+
+    addGameLog(
+        `You punch ${definition.name} for ${damage} damage. (${enemy.health}/${enemy.maxHealth} HP)`,
+        "combat"
+    );
+
+
+    closeContextMenu();
+
+
+    // ========================================================
+    // ENEMY DIES
+    // ========================================================
+
+    if (
+        enemy.health === 0
+    ) {
+
+        enemy.alive =
+            false;
+
+
+        enemy.aggro =
+            false;
+
+
+        enemy.returningHome =
+            false;
+
+
+        addGameLog(
+            `${definition.name} dies.`,
+            "success"
+        );
+
+        dropEnemyLoot(
+            enemy
+        );
+
+
+        // Player still used a turn.
+        // Other enemies may act.
+
+        runEnemyTurn();
+
+
+        return;
+    }
+
+
+    // ========================================================
+    // ENEMY TURN
+    // ========================================================
+
+    runEnemyTurn();
+}
+
+// ============================================================
+// GRID DISTANCE
+// ============================================================
+
+function getGridDistance(
+    x1,
+    y1,
+    x2,
+    y2
+) {
+
+    return (
+        Math.abs(
+            x1 - x2
+        ) +
+        Math.abs(
+            y1 - y2
+        )
+    );
+}
+
+
+// ============================================================
+// ENEMY MOVEMENT CHECK
+// ============================================================
+
+function canEnemyMoveTo(
+    enemy,
+    x,
+    y
+) {
+
+    // Terrain collision
+
+    if (
+        isTileBlocked(
+            x,
+            y
+        )
+    ) {
+
+        return false;
+    }
+
+
+    // Enemy cannot move onto player.
+
+    if (
+        player.x === x &&
+        player.y === y
+    ) {
+
+        return false;
+    }
+
+
+    // Enemy cannot move onto another enemy.
+
+    const otherEnemy =
+        getEnemyAt(
+            x,
+            y
+        );
+
+
+    if (
+        otherEnemy &&
+        otherEnemy !== enemy
+    ) {
+
+        return false;
+    }
+
+
+    return true;
+}
+
+
+// ============================================================
+// MOVE ENEMY TOWARD SPILLER/POSITION
+// ============================================================
+
+function moveEnemyToward(
+    enemy,
+    targetX,
+    targetY
+) {
+
+    const dx =
+        targetX -
+        enemy.x;
+
+    const dy =
+        targetY -
+        enemy.y;
+
+
+    const stepX =
+        Math.sign(
+            dx
+        );
+
+    const stepY =
+        Math.sign(
+            dy
+        );
+
+
+    const moves = [];
+
+
+    if (
+        Math.abs(dx) >=
+        Math.abs(dy)
+    ) {
+
+        if (
+            stepX !== 0
+        ) {
+
+            moves.push({
+                x:
+                    enemy.x +
+                    stepX,
+
+                y:
+                    enemy.y
+            });
+
+        }
+
+
+        if (
+            stepY !== 0
+        ) {
+
+            moves.push({
+                x:
+                    enemy.x,
+
+                y:
+                    enemy.y +
+                    stepY
+            });
+
+        }
+
+    } else {
+
+        if (
+            stepY !== 0
+        ) {
+
+            moves.push({
+                x:
+                    enemy.x,
+
+                y:
+                    enemy.y +
+                    stepY
+            });
+
+        }
+
+
+        if (
+            stepX !== 0
+        ) {
+
+            moves.push({
+                x:
+                    enemy.x +
+                    stepX,
+
+                y:
+                    enemy.y
+            });
+
+        }
+
+    }
+
+
+    for (
+        const move
+        of moves
+    ) {
+
+        if (
+            canEnemyMoveTo(
+                enemy,
+                move.x,
+                move.y
+            )
+        ) {
+
+            enemy.x =
+                move.x;
+
+            enemy.y =
+                move.y;
+
+
+            return true;
+        }
+    }
+
+
+    return false;
+}
+
+
+// ============================================================
+// SINGLE ENEMY TURN
+// ============================================================
+
+function takeEnemyTurn(
+    enemy
+) {
+
+    if (
+        !enemy.alive
+    ) {
+
+        return;
+    }
+
+
+    const definition =
+        window.ENEMY_TYPES[
+            enemy.type
+        ];
+
+
+    if (
+        !definition ||
+        !definition.hostile
+    ) {
+
+        return;
+    }
+
+
+    // ========================================================
+    // RETURN HOME
+    // ========================================================
+
+    if (
+        enemy.returningHome
+    ) {
+
+        const homeDistance =
+            getGridDistance(
+                enemy.x,
+                enemy.y,
+                enemy.homeX,
+                enemy.homeY
+            );
+
+
+        if (
+            homeDistance === 0
+        ) {
+
+            enemy.returningHome =
+                false;
+
+
+            addGameLog(
+                `${definition.name} returns to its territory.`,
+                "combat"
+            );
+
+
+            return;
+        }
+
+
+        moveEnemyToward(
+            enemy,
+            enemy.homeX,
+            enemy.homeY
+        );
+
+
+        return;
+    }
+
+
+    const distance =
+        getGridDistance(
+            enemy.x,
+            enemy.y,
+            player.x,
+            player.y
+        );
+
+
+    // ========================================================
+    // NOTICE PLAYER
+    // ========================================================
+
+    if (
+        !enemy.aggro &&
+        distance <=
+            definition.aggroRange
+    ) {
+
+        enemy.aggro =
+            true;
+
+
+        addGameLog(
+            `${definition.name} notices you.`,
+            "danger"
+        );
+
+    }
+
+
+    if (
+        !enemy.aggro
+    ) {
+
+        return;
+    }
+
+
+    // ========================================================
+    // TERRITORY LIMIT
+    // ========================================================
+
+    const distanceFromHome =
+        getGridDistance(
+            enemy.x,
+            enemy.y,
+            enemy.homeX,
+            enemy.homeY
+        );
+
+
+    if (
+        distanceFromHome >=
+        definition.chaseRadius
+    ) {
+
+        enemy.aggro =
+            false;
+
+        enemy.returningHome =
+            true;
+
+
+        addGameLog(
+            `${definition.name} gives up the chase.`,
+            "combat"
+        );
+
+
+        return;
+    }
+
+
+    // ========================================================
+    // ATTACK PLAYER
+    // ========================================================
+
+    if (
+        distance === 1
+    ) {
+
+        damagePlayer(
+            definition.damage,
+            definition.name
+        );
+
+
+        return;
+    }
+
+
+    // ========================================================
+    // CHASE PLAYER
+    // ========================================================
+
+    const moved =
+        moveEnemyToward(
+            enemy,
+            player.x,
+            player.y
+        );
+
+
+    if (
+        moved
+    ) {
+
+        addGameLog(
+            `${definition.name} moves closer.`,
+            "combat"
+        );
+
+    }
+}
+
+// ============================================================
+// ENEMY TURN
+// ============================================================
+
+function runEnemyTurn() {
+
+    for (
+        const enemy
+        of enemies
+    ) {
+
+        takeEnemyTurn(
+            enemy
+        );
+
+    }
+}
+
+// ============================================================
+// ENEMY LOOT
+// ============================================================
+
+function dropEnemyLoot(
+    enemy
+) {
+
+    if (!enemy) {
+
+        return;
+
+    }
+
+
+    const definition =
+        window.ENEMY_TYPES[
+            enemy.type
+        ];
+
+
+    if (
+        !definition ||
+        !definition.loot
+    ) {
+
+        return;
+    }
+
+
+    for (
+        const loot
+        of definition.loot
+    ) {
+
+        if (
+            Math.random() >
+            loot.chance
+        ) {
+
+            continue;
+        }
+
+
+        const amount =
+            Math.floor(
+                Math.random() *
+                (
+                    loot.maxAmount -
+                    loot.minAmount +
+                    1
+                )
+            ) +
+            loot.minAmount;
+
+
+        addItem(
+            loot.itemId,
+            amount
+        );
+
+
+        const item =
+            window.ITEMS[
+                loot.itemId
+            ];
+
+
+        if (item) {
+
+            addGameLog(
+                `You receive ${amount}x ${item.name}.`,
+                "success"
+            );
+
+        }
+    }
 }
 
 // ============================================================
@@ -2293,6 +3124,28 @@ canvas.addEventListener(
 
         }
 
+        // ========================================================
+        // ENEMY
+        // ========================================================
+
+        const enemy =
+            getEnemyAt(
+                tile.x,
+                tile.y
+            );
+
+
+        if (enemy) {
+
+            openEnemyContextMenu(
+                mouseX,
+                mouseY,
+                enemy
+            );
+
+
+            return;
+        }
 
         const target =
             findTileAt(
@@ -2382,6 +3235,8 @@ closeInventoryButton.addEventListener(
 
     }
 );
+
+
 
 // ============================================================
 // DRAW TILE
@@ -2767,6 +3622,108 @@ function findTileAt(
 }
 
 // ============================================================
+// OPEN ENEMY CONTEXT MENU
+// ============================================================
+
+function openEnemyContextMenu(
+    screenX,
+    screenY,
+    enemy
+) {
+
+    if (
+        !enemy ||
+        !enemy.alive
+    ) {
+
+        return;
+    }
+
+
+    const definition =
+        window.ENEMY_TYPES[
+            enemy.type
+        ];
+
+
+    if (!definition) {
+
+        return;
+    }
+
+
+    contextTarget = {
+        targetType: "enemy",
+        enemy: enemy
+    };
+
+
+    contextActions.innerHTML =
+        "";
+
+
+    contextTitle.textContent =
+        definition.name;
+
+
+    // ========================================================
+    // ATTACK
+    // ========================================================
+
+    addContextAction(
+        "Attack",
+        () => {
+
+            attackEnemy(
+                enemy
+            );
+
+        }
+    );
+
+
+    // ========================================================
+    // EXAMINE
+    // ========================================================
+
+    addContextAction(
+        "Examine",
+        () => {
+
+            addGameLog(
+                `${definition.description} Health: ${enemy.health}/${enemy.maxHealth}.`,
+                "normal"
+            );
+
+
+            closeContextMenu();
+
+        }
+    );
+
+
+    // ========================================================
+    // POSITION
+    // ========================================================
+
+    contextMenu.style.left =
+        `${screenX}px`;
+
+    contextMenu.style.top =
+        `${screenY}px`;
+
+
+    contextMenu.classList.remove(
+        "hidden"
+    );
+
+
+    requestAnimationFrame(
+        keepContextMenuOnScreen
+    );
+}
+
+// ============================================================
 // OPEN CONTEXT MENU
 // ============================================================
 
@@ -3078,6 +4035,11 @@ function chopTree(
             "You are too far away."
         );
 
+        addGameLog(
+            "You are too far away to chop the tree.",
+            "action"
+        );
+
 
         closeContextMenu();
 
@@ -3114,6 +4076,12 @@ function chopTree(
 
     console.log(
         "Tree chopped. Wood +1"
+    );
+
+
+    addGameLog(
+        "You chop down a tree and receive 1 Wood and 4 Tree Seeds.",
+        "success"
     );
 
 
@@ -3456,9 +4424,48 @@ function drawPlayer(
             tileHeight
         );
 
+    } else {
 
-        return;
+        ctx.fillStyle =
+            "#000";
 
+
+        ctx.fillRect(
+            screenX,
+            screenY,
+            tileWidth,
+            tileHeight
+        );
+
+
+        ctx.fillStyle =
+            "#ffff55";
+
+
+        ctx.font =
+            `${Math.floor(
+                tileHeight *
+                0.9
+            )}px monospace`;
+
+
+        ctx.textAlign =
+            "center";
+
+
+        ctx.textBaseline =
+            "middle";
+
+
+        ctx.fillText(
+            "@",
+
+            screenX +
+            tileWidth / 2,
+
+            screenY +
+            tileHeight / 2
+        );
     }
 
 
@@ -3505,6 +4512,14 @@ function drawPlayer(
 
         screenY +
         tileHeight / 2
+    );
+
+    drawDamageFlash(
+        player.damageFlashUntil,
+        screenX,
+        screenY,
+        tileWidth,
+        tileHeight
     );
 
 }

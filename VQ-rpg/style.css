@@ -108,6 +108,142 @@ body {
     color: #9fd89f;
 }
 
+/* =========================================================
+   GAME LOG SIDEBAR
+========================================================= */
+
+#logSidebar {
+    width: 300px;
+    min-width: 300px;
+
+    height: 100%;
+
+    padding: 8px;
+
+    background: #171917;
+
+    border-left: 2px solid #384638;
+
+    display: flex;
+    flex-direction: column;
+
+    gap: 8px;
+}
+
+
+#logTitle {
+    padding: 12px 8px;
+
+    text-align: center;
+
+    color: #aaff88;
+
+    background: #101510;
+
+    border: 1px solid #577057;
+
+    font-weight: bold;
+
+    font-size: 15px;
+}
+
+
+/* =========================================================
+   LOG CONTENT
+========================================================= */
+
+#gameLog {
+    flex: 1;
+
+    min-height: 0;
+
+    overflow-y: auto;
+    overflow-x: hidden;
+
+    padding: 8px;
+
+    background: #0d110d;
+
+    border: 1px solid #364536;
+
+    font-size: 11px;
+
+    line-height: 17px;
+
+    scrollbar-width: thin;
+    scrollbar-color:
+        #526852
+        #101510;
+}
+
+
+#gameLog::-webkit-scrollbar {
+    width: 10px;
+}
+
+
+#gameLog::-webkit-scrollbar-track {
+    background: #101510;
+}
+
+
+#gameLog::-webkit-scrollbar-thumb {
+    background: #526852;
+
+    border: 2px solid #101510;
+}
+
+
+#gameLog::-webkit-scrollbar-thumb:hover {
+    background: #708870;
+}
+
+
+/* =========================================================
+   LOG ENTRIES
+========================================================= */
+
+.logEntry {
+    padding: 4px 3px;
+
+    border-bottom: 1px solid #202920;
+
+    color: #a9cfa9;
+
+    word-wrap: break-word;
+}
+
+
+.logEntry::before {
+    content: "> ";
+
+    color: #5e8a5e;
+}
+
+
+.log-system {
+    color: #8fae8f;
+}
+
+
+.log-action {
+    color: #c8ffc8;
+}
+
+
+.log-combat {
+    color: #e8d56b;
+}
+
+
+.log-danger {
+    color: #ff7777;
+}
+
+
+.log-success {
+    color: #8cff8c;
+}
 
 /* =========================================================
    MAIN AREA

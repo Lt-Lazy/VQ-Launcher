@@ -74,6 +74,32 @@ window.ITEMS = {
         ]
     },
 
+    spider_web: {
+
+        id: "spider_web",
+
+        name: "Spider Web",
+
+        category: "resource",
+
+        description:
+            "Sticky web collected from a spider.",
+
+        stackable: true,
+
+        maxStack: 99,
+
+        weight: 0.1,
+
+        value: 2,
+
+        tags: [
+            "spider",
+            "material",
+            "crafting"
+        ]
+    },
+
 
     // ========================================================
     // FOOD

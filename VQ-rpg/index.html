@@ -132,6 +132,122 @@
 
                 </div>
 
+                <!-- CRAFTING WINDOW -->
+
+                <div id="craftingWindow" class="gameWindow hidden">
+
+                    <div class="windowHeader">
+
+                        <span>Crafting</span>
+
+                        <button
+                            id="closeCraftingButton"
+                            class="windowCloseButton"
+                        >
+                            X
+                        </button>
+
+                    </div>
+
+
+                    <div id="craftingList"></div>
+
+                </div>
+
+                <!-- CHARACTER WINDOW -->
+
+                <div id="characterWindow" class="gameWindow hidden">
+
+                    <div class="windowHeader">
+
+                        <span>Character</span>
+
+                        <button
+                            id="closeCharacterButton"
+                            class="windowCloseButton"
+                        >
+                            X
+                        </button>
+
+                    </div>
+
+
+                    <div id="characterContent">
+
+                        <div class="characterWindowSection">
+
+                            <div class="characterWindowSectionTitle">
+                                Equipment
+                            </div>
+
+
+                            <!-- HAND -->
+
+                            <div class="equipmentSlot">
+
+                                <div class="equipmentSlotInfo">
+
+                                    <div class="equipmentSlotLabel">
+                                        Hand
+                                    </div>
+
+                                    <div
+                                        id="handEquipmentName"
+                                        class="equipmentItemName"
+                                    >
+                                        Empty
+                                    </div>
+
+                                </div>
+
+
+                                <button
+                                    id="unequipHandButton"
+                                    class="unequipButton"
+                                    disabled
+                                >
+                                    Unequip
+                                </button>
+
+                            </div>
+
+
+                            <!-- ARMOR -->
+
+                            <div class="equipmentSlot">
+
+                                <div class="equipmentSlotInfo">
+
+                                    <div class="equipmentSlotLabel">
+                                        Armor
+                                    </div>
+
+                                    <div
+                                        id="armorEquipmentName"
+                                        class="equipmentItemName"
+                                    >
+                                        Empty
+                                    </div>
+
+                                </div>
+
+
+                                <button
+                                    id="unequipArmorButton"
+                                    class="unequipButton"
+                                    disabled
+                                >
+                                    Unequip
+                                </button>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
             </div>
 
 
@@ -152,6 +268,20 @@
                         class="toolbarButton"
                     >
                         Inventory
+                    </button>
+
+                    <button
+                        id="craftingButton"
+                        class="toolbarButton"
+                    >
+                        Crafting
+                    </button>
+
+                    <button
+                        id="characterButton"
+                        class="toolbarButton"
+                    >
+                        Character
                     </button>
 
                 </div>

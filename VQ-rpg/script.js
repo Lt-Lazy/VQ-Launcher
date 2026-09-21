@@ -62,6 +62,29 @@ const inventoryList =
         "inventoryList"
     );
 
+const craftingButton =
+    document.getElementById(
+        "craftingButton"
+    );
+
+
+const craftingWindow =
+    document.getElementById(
+        "craftingWindow"
+    );
+
+
+const closeCraftingButton =
+    document.getElementById(
+        "closeCraftingButton"
+    );
+
+
+const craftingList =
+    document.getElementById(
+        "craftingList"
+    );
+
 const playerHealthDisplay =
     document.getElementById(
         "playerHealth"
@@ -70,6 +93,47 @@ const playerHealthDisplay =
 const gameLog =
     document.getElementById(
         "gameLog"
+    );
+
+const characterButton =
+    document.getElementById(
+        "characterButton"
+    );
+
+
+const characterWindow =
+    document.getElementById(
+        "characterWindow"
+    );
+
+
+const closeCharacterButton =
+    document.getElementById(
+        "closeCharacterButton"
+    );
+
+
+const handEquipmentName =
+    document.getElementById(
+        "handEquipmentName"
+    );
+
+
+const armorEquipmentName =
+    document.getElementById(
+        "armorEquipmentName"
+    );
+
+
+const unequipHandButton =
+    document.getElementById(
+        "unequipHandButton"
+    );
+
+
+const unequipArmorButton =
+    document.getElementById(
+        "unequipArmorButton"
     );
 
 // ============================================================
@@ -221,21 +285,21 @@ player.image.src =
 // ============================================================
 // INVENTORY
 // ============================================================
-//
-// Key = item ID fra items.js
-// Value = antall spilleren eier.
-//
-// Eksempel: (det er sånn de blir lagret liksom)
-//
-// {
-//     wood: 14,
-//     berries: 3
-// }
-//
-// Items spilleren ikke eier finnes ikke i objektet.
-// ============================================================
+
 
 const inventory = {};
+
+// ============================================================
+// EQUIPMENT
+// ============================================================
+
+const equipment = {
+
+    hand: null,
+
+    armor: null
+
+};
 
 // ============================================================
 // INVENTORY UI
@@ -414,8 +478,68 @@ function updateInventoryUI() {
         );
 
 
-        row.appendChild(
+        // ========================================================
+        // RIGHT SIDE
+        // ========================================================
+
+        const actions =
+            document.createElement(
+                "div"
+            );
+
+
+        actions.className =
+            "inventoryItemActions";
+
+
+        actions.appendChild(
             quantity
+        );
+
+
+        // Equip button only for equipment.
+
+        if (
+            item.equipSlot
+        ) {
+
+            const equipButton =
+                document.createElement(
+                    "button"
+                );
+
+
+            equipButton.className =
+                "inventoryEquipButton";
+
+
+            equipButton.textContent =
+                "Equip";
+
+
+            equipButton.addEventListener(
+                "click",
+                event => {
+
+                    event.stopPropagation();
+
+
+                    equipItem(
+                        itemId
+                    );
+
+                }
+            );
+
+
+            actions.appendChild(
+                equipButton
+            );
+        }
+
+
+        row.appendChild(
+            actions
         );
 
 
@@ -427,12 +551,668 @@ function updateInventoryUI() {
 
 function toggleInventory() {
 
-    inventoryWindow.classList.toggle(
-        "hidden"
+    const opening =
+        inventoryWindow.classList.contains(
+            "hidden"
+        );
+
+
+    if (opening) {
+
+        craftingWindow.classList.add(
+            "hidden"
+        );
+
+        characterWindow.classList.add(
+            "hidden"
+        );
+
+        inventoryWindow.classList.remove(
+            "hidden"
+        );
+
+
+        updateInventoryUI();
+
+    } else {
+
+        inventoryWindow.classList.add(
+            "hidden"
+        );
+
+    }
+}
+
+// ============================================================
+// GET EQUIPPED ITEM
+// ============================================================
+
+function getEquippedItem(
+    slot
+) {
+
+    const itemId =
+        equipment[
+            slot
+        ];
+
+
+    if (!itemId) {
+
+        return null;
+    }
+
+
+    return (
+        window.ITEMS[
+            itemId
+        ] || null
+    );
+}
+
+
+// ============================================================
+// EQUIP ITEM
+// ============================================================
+
+function equipItem(
+    itemId
+) {
+
+    const item =
+        window.ITEMS[
+            itemId
+        ];
+
+
+    if (
+        !item ||
+        !item.equipSlot
+    ) {
+
+        return false;
+    }
+
+
+    if (
+        getItemAmount(
+            itemId
+        ) <= 0
+    ) {
+
+        return false;
+    }
+
+
+    const slot =
+        item.equipSlot;
+
+
+    // ========================================================
+    // RETURN OLD ITEM TO INVENTORY
+    // ========================================================
+
+    const oldItemId =
+        equipment[
+            slot
+        ];
+
+
+    if (oldItemId) {
+
+        addItem(
+            oldItemId,
+            1
+        );
+
+    }
+
+
+    // ========================================================
+    // REMOVE NEW ITEM FROM INVENTORY
+    // ========================================================
+
+    if (
+        !removeItem(
+            itemId,
+            1
+        )
+    ) {
+
+        return false;
+    }
+
+
+    equipment[
+        slot
+    ] = itemId;
+
+
+    addGameLog(
+        `You equip ${item.name}.`,
+        "success"
     );
 
 
     updateInventoryUI();
+
+    updateCharacterUI();
+
+
+    return true;
+}
+
+
+// ============================================================
+// UNEQUIP
+// ============================================================
+
+function unequipItem(
+    slot
+) {
+
+    const itemId =
+        equipment[
+            slot
+        ];
+
+
+    if (!itemId) {
+
+        return;
+    }
+
+
+    const item =
+        window.ITEMS[
+            itemId
+        ];
+
+
+    equipment[
+        slot
+    ] = null;
+
+
+    addItem(
+        itemId,
+        1
+    );
+
+
+    if (item) {
+
+        addGameLog(
+            `You unequip ${item.name}.`,
+            "action"
+        );
+
+    }
+
+
+    updateInventoryUI();
+
+    updateCharacterUI();
+}
+
+// ============================================================
+// CHECK EQUIPPED TOOL
+// ============================================================
+
+function hasEquippedTool(
+    toolType
+) {
+
+    const handItem =
+        getEquippedItem(
+            "hand"
+        );
+
+
+    if (!handItem) {
+
+        return false;
+    }
+
+
+    return (
+        handItem.toolType ===
+        toolType
+    );
+}
+
+
+// ============================================================
+// CHARACTER UI
+// ============================================================
+
+function updateCharacterUI() {
+
+    const handItem =
+        getEquippedItem(
+            "hand"
+        );
+
+
+    const armorItem =
+        getEquippedItem(
+            "armor"
+        );
+
+
+    // HAND
+
+    if (handItem) {
+
+        handEquipmentName.textContent =
+            handItem.name;
+
+
+        unequipHandButton.disabled =
+            false;
+
+    } else {
+
+        handEquipmentName.textContent =
+            "Empty";
+
+
+        unequipHandButton.disabled =
+            true;
+
+    }
+
+
+    // ARMOR
+
+    if (armorItem) {
+
+        armorEquipmentName.textContent =
+            armorItem.name;
+
+
+        unequipArmorButton.disabled =
+            false;
+
+    } else {
+
+        armorEquipmentName.textContent =
+            "Empty";
+
+
+        unequipArmorButton.disabled =
+            true;
+
+    }
+}
+
+// ============================================================
+// CRAFTING
+// ============================================================
+
+function canCraftRecipe(
+    recipe
+) {
+
+    if (
+        !recipe ||
+        !recipe.ingredients
+    ) {
+
+        return false;
+    }
+
+
+    for (
+        const ingredient
+        of recipe.ingredients
+    ) {
+
+        if (
+            getItemAmount(
+                ingredient.itemId
+            ) <
+            ingredient.amount
+        ) {
+
+            return false;
+        }
+    }
+
+
+    return true;
+}
+
+
+// ============================================================
+// CRAFT RECIPE
+// ============================================================
+
+function craftRecipe(
+    recipeId
+) {
+
+    const recipe =
+        window.CRAFTING_RECIPES[
+            recipeId
+        ];
+
+
+    if (!recipe) {
+
+        console.error(
+            `Unknown recipe: ${recipeId}`
+        );
+
+        return;
+    }
+
+
+    if (
+        !canCraftRecipe(
+            recipe
+        )
+    ) {
+
+        addGameLog(
+            "You do not have the required materials.",
+            "action"
+        );
+
+
+        return;
+    }
+
+
+    // ========================================================
+    // REMOVE INGREDIENTS
+    // ========================================================
+
+    for (
+        const ingredient
+        of recipe.ingredients
+    ) {
+
+        removeItem(
+            ingredient.itemId,
+            ingredient.amount
+        );
+
+    }
+
+
+    // ========================================================
+    // GIVE CRAFTED ITEM
+    // ========================================================
+
+    addItem(
+        recipe.output.itemId,
+        recipe.output.amount
+    );
+
+
+    const outputItem =
+        window.ITEMS[
+            recipe.output.itemId
+        ];
+
+
+    if (outputItem) {
+
+        addGameLog(
+            `You craft ${outputItem.name}.`,
+            "success"
+        );
+
+    }
+
+
+    updateCraftingUI();
+
+
+    // Crafting counts as one player turn.
+
+    runEnemyTurn();
+}
+
+
+// ============================================================
+// CRAFTING UI
+// ============================================================
+
+function updateCraftingUI() {
+
+    craftingList.innerHTML =
+        "";
+
+
+    if (
+        !window.CRAFTING_RECIPES
+    ) {
+
+        return;
+    }
+
+
+    const recipes =
+        Object.values(
+            window.CRAFTING_RECIPES
+        ).filter(recipe =>
+            canCraftRecipe(recipe)
+        );
+
+
+    // Hvis ingen recipes kan lages akkurat nå
+
+    if (
+        recipes.length === 0
+    ) {
+
+        const empty =
+            document.createElement(
+                "div"
+            );
+
+
+        empty.className =
+            "inventoryEmpty";
+
+
+        empty.textContent =
+            "You do not have materials for any recipes.";
+
+
+        craftingList.appendChild(
+            empty
+        );
+
+
+        return;
+    }
+
+
+    for (
+        const recipe
+        of recipes
+    ) {
+
+        const outputItem =
+            window.ITEMS[
+                recipe.output.itemId
+            ];
+
+
+        if (!outputItem) {
+
+            continue;
+        }
+
+
+        const recipeElement =
+            document.createElement(
+                "div"
+            );
+
+
+        recipeElement.className =
+            "craftingRecipe";
+
+
+        const name =
+            document.createElement(
+                "div"
+            );
+
+
+        name.className =
+            "craftingRecipeName";
+
+
+        name.textContent =
+            outputItem.name;
+
+
+        recipeElement.appendChild(
+            name
+        );
+
+
+        const ingredients =
+            document.createElement(
+                "div"
+            );
+
+
+        ingredients.className =
+            "craftingIngredients";
+
+
+        for (
+            const ingredient
+            of recipe.ingredients
+        ) {
+
+            const item =
+                window.ITEMS[
+                    ingredient.itemId
+                ];
+
+
+            if (!item) {
+
+                continue;
+            }
+
+
+            const ownedAmount =
+                getItemAmount(
+                    ingredient.itemId
+                );
+
+
+            const ingredientRow =
+                document.createElement(
+                    "div"
+                );
+
+
+            ingredientRow.textContent =
+                `${item.name}: ${ownedAmount}/${ingredient.amount}`;
+
+
+            ingredientRow.classList.add(
+                "craftingIngredientOwned"
+            );
+
+
+            ingredients.appendChild(
+                ingredientRow
+            );
+
+        }
+
+
+        recipeElement.appendChild(
+            ingredients
+        );
+
+
+        const button =
+            document.createElement(
+                "button"
+            );
+
+
+        button.className =
+            "craftButton";
+
+
+        button.textContent =
+            "Craft";
+
+
+        button.addEventListener(
+            "click",
+            () => {
+
+                craftRecipe(
+                    recipe.id
+                );
+
+            }
+        );
+
+
+        recipeElement.appendChild(
+            button
+        );
+
+
+        craftingList.appendChild(
+            recipeElement
+        );
+    }
+}
+
+
+// ============================================================
+// TOGGLE CRAFTING
+// ============================================================
+
+function toggleCrafting() {
+
+    const opening =
+        craftingWindow.classList.contains(
+            "hidden"
+        );
+
+
+    if (opening) {
+
+        // Don't overlap Inventory.
+
+        inventoryWindow.classList.add(
+            "hidden"
+        );
+
+        characterWindow.classList.add(
+            "hidden"
+        );
+
+        craftingWindow.classList.remove(
+            "hidden"
+        );
+
+
+        updateCraftingUI();
+
+    } else {
+
+        craftingWindow.classList.add(
+            "hidden"
+        );
+
+    }
 }
 
 // ============================================================
@@ -2458,7 +3238,7 @@ function attackEnemy(
     // ========================================================
 
     const damage =
-        player.unarmedDamage;
+        getPlayerAttackDamage();
 
 
     enemy.health -=
@@ -2486,13 +3266,52 @@ function attackEnemy(
         false;
 
 
-    addGameLog(
-        `You punch ${definition.name} for ${damage} damage. (${enemy.health}/${enemy.maxHealth} HP)`,
-        "combat"
-    );
+    const handItem =
+        getEquippedItem(
+            "hand"
+        );
+
+
+    if (handItem) {
+
+        addGameLog(
+            `You attack ${definition.name} with ${handItem.name} for ${damage} damage. (${enemy.health}/${enemy.maxHealth} HP)`,
+            "combat"
+        );
+
+    } else {
+
+        addGameLog(
+            `You punch ${definition.name} for ${damage} damage. (${enemy.health}/${enemy.maxHealth} HP)`,
+            "combat"
+        );
+
+    }
 
 
     closeContextMenu();
+
+    function getPlayerAttackDamage() {
+
+        const handItem =
+            getEquippedItem(
+                "hand"
+            );
+
+
+        if (
+            handItem &&
+            Number.isFinite(
+                handItem.damage
+            )
+        ) {
+
+            return handItem.damage;
+        }
+
+
+        return player.unarmedDamage;
+    }
 
 
     // ========================================================
@@ -2939,7 +3758,7 @@ function takeEnemyTurn(
         moved
     ) {
 
-        addGameLog(
+        console.log(
             `${definition.name} moves closer.`,
             "combat"
         );
@@ -3236,6 +4055,102 @@ closeInventoryButton.addEventListener(
     }
 );
 
+craftingButton.addEventListener(
+    "click",
+    () => {
+
+        toggleCrafting();
+
+    }
+);
+
+
+closeCraftingButton.addEventListener(
+    "click",
+    () => {
+
+        craftingWindow.classList.add(
+            "hidden"
+        );
+
+    }
+);
+
+characterButton.addEventListener(
+    "click",
+    () => {
+
+        const opening =
+            characterWindow.classList.contains(
+                "hidden"
+            );
+
+
+        if (opening) {
+
+            inventoryWindow.classList.add(
+                "hidden"
+            );
+
+
+            craftingWindow.classList.add(
+                "hidden"
+            );
+
+
+            characterWindow.classList.remove(
+                "hidden"
+            );
+
+
+            updateCharacterUI();
+
+        } else {
+
+            characterWindow.classList.add(
+                "hidden"
+            );
+
+        }
+
+    }
+);
+
+
+closeCharacterButton.addEventListener(
+    "click",
+    () => {
+
+        characterWindow.classList.add(
+            "hidden"
+        );
+
+    }
+);
+
+
+unequipHandButton.addEventListener(
+    "click",
+    () => {
+
+        unequipItem(
+            "hand"
+        );
+
+    }
+);
+
+
+unequipArmorButton.addEventListener(
+    "click",
+    () => {
+
+        unequipItem(
+            "armor"
+        );
+
+    }
+);
 
 
 // ============================================================
@@ -3798,10 +4713,12 @@ function openContextMenu(
 
 
         addContextAction(
-            "Mine",
+            "Gather Small Rocks",
             () => {
 
- 
+                gatherSmallRocks(
+                    contextTarget
+                );
 
             }
         );
@@ -3811,8 +4728,46 @@ function openContextMenu(
             "Examine",
             () => {
 
-                console.log(
-                    "It is a stone/rock, depends."
+                addGameLog(
+                    "A large stone formation. Small loose rocks can be found around it.",
+                    "normal"
+                );
+
+
+                closeContextMenu();
+
+            }
+        );
+
+    }
+
+    else if (
+        objectType === "bush"
+    ) {
+
+        contextTitle.textContent =
+            "Bush";
+
+
+        addContextAction(
+            "Gather Sticks",
+            () => {
+
+                gatherSticks(
+                    contextTarget
+                );
+
+            }
+        );
+
+
+        addContextAction(
+            "Examine",
+            () => {
+
+                addGameLog(
+                    "A small bush with several usable sticks.",
+                    "normal"
                 );
 
 
@@ -3994,6 +4949,157 @@ function keepContextMenuOnScreen() {
 }
 
 // ============================================================
+// GATHER SMALL ROCKS
+// ============================================================
+
+function gatherSmallRocks(
+    target
+) {
+
+    if (!target) {
+
+        return;
+    }
+
+
+    if (
+        target.properties.objectType !==
+        "stone"
+    ) {
+
+        return;
+    }
+
+
+    // Player must stand next to the stone.
+
+    if (
+        !isPlayerAdjacentTo(
+            target.x,
+            target.y
+        )
+    ) {
+
+        addGameLog(
+            "You are too far away to gather rocks.",
+            "action"
+        );
+
+
+        closeContextMenu();
+
+        return;
+    }
+
+
+    // Random amount: 1-3
+
+    const amount =
+        Math.floor(
+            Math.random() * 3
+        ) + 1;
+
+
+    addItem(
+        "small_rock",
+        amount
+    );
+
+
+    addGameLog(
+        `You gather ${amount} Small Rock${amount === 1 ? "" : "s"}.`,
+        "success"
+    );
+
+
+    closeContextMenu();
+
+
+    // Gathering uses one turn.
+
+    runEnemyTurn();
+}
+
+// ============================================================
+// GATHER STICKS
+// ============================================================
+
+function gatherSticks(
+    target
+) {
+
+    if (!target) {
+
+        return;
+    }
+
+
+    if (
+        target.properties.objectType !==
+        "bush"
+    ) {
+
+        return;
+    }
+
+
+    // Bushes are walkable, so the player
+    // may stand either on it or next to it.
+
+    const distance =
+        Math.abs(
+            player.x - target.x
+        ) +
+        Math.abs(
+            player.y - target.y
+        );
+
+
+    if (
+        distance > 1
+    ) {
+
+        addGameLog(
+            "You are too far away to gather sticks.",
+            "action"
+        );
+
+
+        closeContextMenu();
+
+        return;
+    }
+
+
+    addItem(
+        "stick",
+        5
+    );
+
+
+    // Bush is depleted and disappears.
+
+    setTile(
+        target.layer,
+        target.x,
+        target.y,
+        0
+    );
+
+
+    addGameLog(
+        "You gather 5 Sticks from the bush.",
+        "success"
+    );
+
+
+    closeContextMenu();
+
+
+    runEnemyTurn();
+}
+
+// ============================================================
 // CHOP TREE
 // ============================================================
 
@@ -4019,9 +5125,8 @@ function chopTree(
         return;
     }
 
-
     // -------------------------
-    // PLAYER MUST BE ADJACENT
+    // PLAYER MUST BE ADJACENT (fancy word of the day)
     // -------------------------
 
     if (
@@ -4046,6 +5151,26 @@ function chopTree(
         return;
     }
 
+    // -------------------------
+    // AXE REQUIRED
+    // -------------------------
+
+    if (
+        !hasEquippedTool(
+            "axe"
+        )
+    ) {
+
+        addGameLog(
+            "You need an axe equipped to chop this tree.",
+            "action"
+        );
+
+
+        closeContextMenu();
+
+        return;
+    }
 
     // -------------------------
     // REMOVE TREE

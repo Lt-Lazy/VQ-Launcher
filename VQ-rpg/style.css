@@ -712,6 +712,125 @@ body {
 }
 
 /* =========================================================
+   CRAFTING
+========================================================= */
+
+#craftingWindow {
+    width: 360px;
+    height: 420px;
+
+    display: flex;
+    flex-direction: column;
+
+    overflow: hidden;
+}
+
+
+#craftingWindow.hidden {
+    display: none;
+}
+
+
+#craftingWindow .windowHeader {
+    flex-shrink: 0;
+}
+
+
+#craftingList {
+    flex: 1;
+
+    min-height: 0;
+
+    overflow-y: auto;
+
+    padding: 8px;
+
+    background: #0d110d;
+}
+
+
+/* =========================================================
+   CRAFTING RECIPE
+========================================================= */
+
+.craftingRecipe {
+    padding: 8px;
+
+    margin-bottom: 8px;
+
+    background: #141a14;
+
+    border: 1px solid #354535;
+}
+
+
+.craftingRecipeName {
+    margin-bottom: 6px;
+
+    color: #caffaa;
+
+    font-size: 13px;
+
+    font-weight: bold;
+}
+
+
+.craftingIngredients {
+    margin-bottom: 8px;
+
+    font-size: 11px;
+
+    line-height: 17px;
+
+    color: #a5c8a5;
+}
+
+
+.craftingIngredientMissing {
+    color: #ff7777;
+}
+
+
+.craftingIngredientOwned {
+    color: #8cff8c;
+}
+
+
+.craftButton {
+    width: 100%;
+
+    height: 30px;
+
+    background: #263126;
+
+    border: 1px solid #637563;
+
+    color: #d6ffd6;
+
+    font-family:
+        "Courier New",
+        monospace;
+
+    font-size: 11px;
+
+    cursor: pointer;
+}
+
+
+.craftButton:hover:not(:disabled) {
+    background: #354435;
+
+    color: #ffffff;
+}
+
+
+.craftButton:disabled {
+    opacity: 0.45;
+
+    cursor: default;
+}
+
+/* =========================================================
    HEALTH
 ========================================================= */
 
@@ -761,4 +880,160 @@ body {
     background: #d9473f;
 
     color: #fff;
+}
+
+/* =========================================================
+   CHARACTER WINDOW
+========================================================= */
+
+#characterWindow {
+    width: 360px;
+    height: 420px;
+
+    display: flex;
+    flex-direction: column;
+
+    overflow: hidden;
+}
+
+
+#characterWindow.hidden {
+    display: none;
+}
+
+
+#characterContent {
+    flex: 1;
+
+    padding: 10px;
+
+    background: #0d110d;
+}
+
+
+.characterWindowSection {
+    border: 1px solid #354535;
+
+    background: #121712;
+}
+
+
+.characterWindowSectionTitle {
+    padding: 7px 8px;
+
+    background: #202720;
+
+    border-bottom: 1px solid #354535;
+
+    color: #caffaa;
+
+    font-size: 12px;
+
+    font-weight: bold;
+}
+
+
+/* =========================================================
+   EQUIPMENT
+========================================================= */
+
+.equipmentSlot {
+    min-height: 58px;
+
+    padding: 8px;
+
+    display: flex;
+
+    align-items: center;
+    justify-content: space-between;
+
+    border-bottom: 1px solid #293529;
+}
+
+
+.equipmentSlot:last-child {
+    border-bottom: none;
+}
+
+
+.equipmentSlotLabel {
+    margin-bottom: 4px;
+
+    color: #708870;
+
+    font-size: 10px;
+
+    text-transform: uppercase;
+}
+
+
+.equipmentItemName {
+    color: #d6ffd6;
+
+    font-size: 12px;
+}
+
+
+.unequipButton {
+    padding: 5px 8px;
+
+    background: #263126;
+
+    border: 1px solid #637563;
+
+    color: #d6ffd6;
+
+    font-family:
+        "Courier New",
+        monospace;
+
+    font-size: 10px;
+
+    cursor: pointer;
+}
+
+
+.unequipButton:disabled {
+    opacity: 0.35;
+
+    cursor: default;
+}
+
+
+/* =========================================================
+   INVENTORY EQUIP BUTTON
+========================================================= */
+
+.inventoryItemActions {
+    display: flex;
+
+    align-items: center;
+
+    gap: 8px;
+
+    margin-left: 10px;
+}
+
+
+.inventoryEquipButton {
+    padding: 3px 6px;
+
+    background: #263126;
+
+    border: 1px solid #637563;
+
+    color: #caffaa;
+
+    font-family:
+        "Courier New",
+        monospace;
+
+    font-size: 9px;
+
+    cursor: pointer;
+}
+
+
+.inventoryEquipButton:hover {
+    background: #354435;
 }

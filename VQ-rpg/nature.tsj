@@ -8,7 +8,7 @@
  "margin":0,
  "name":"nature",
  "spacing":0,
- "tilecount":6,
+ "tilecount":7,
  "tiledversion":"1.11.2",
  "tileheight":32,
  "tiles":[
@@ -85,6 +85,18 @@
                  "name":"objectType",
                  "type":"string",
                  "value":"stone"
+                }]
+        }, 
+        {
+         "id":7,
+         "image":"assets\/tiles\/nature\/bush.png",
+         "imageheight":16,
+         "imagewidth":16,
+         "properties":[
+                {
+                 "name":"objectType",
+                 "type":"string",
+                 "value":"bush"
                 }]
         }],
  "tilewidth":16,

@@ -99,6 +99,17 @@ const games = [
 const news = [
 
     {
+        date: "21 SEP 2026, 12:45 (UTC+2)",
+
+        game: "Void Quest RPG",
+
+        title: "Change log",
+
+        text:
+            "Mechanics added: Enemy system, loot drops, enemy aggro, small combat (turn based), game/combat log."
+    },
+
+    {
         date: "21 SEP 2026, 01:51 (UTC+2)",
 
         game: "Void Quest RPG",

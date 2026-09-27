@@ -40,6 +40,13 @@
                 <hr>
 
                 <p>
+                    Tool:
+                    <span id="tool-value">None</span>
+                </p>
+
+                <hr>
+
+                <p>
                     Coins:
                     <span id="coins-value">50</span>
                 </p>
@@ -52,6 +59,16 @@
                     type="button"
                 >
                     INVENTORY [I]
+                </button>
+
+                <hr>
+
+                <button
+                    id="crafting-button"
+                    class="character-action-button"
+                    type="button"
+                >
+                    CRAFTING [C]
                 </button>
 
                 <hr>
@@ -185,8 +202,38 @@
                 ></div>
             </div>
 
+            <div
+                id="crafting-window"
+                class="game-window hidden"
+                aria-hidden="true"
+            >
+
+                <div class="game-window-header">
+
+                    <span>
+                        CRAFTING
+                    </span>
+
+                    <button
+                        id="close-crafting-window"
+                        class="game-window-close"
+                        type="button"
+                    >
+                        X
+                    </button>
+
+                </div>
+
+
+                <div
+                    id="crafting-window-content"
+                    class="game-window-content"
+                ></div>
+
+            </div>
+
             <div id="controls">
-                WASD / Arrows — Move | Mouse Wheel / +/- — Zoom | 0 — Reset Zoom | . — Wait | E — Interact | I — Inventory
+                WASD / Arrows — Move | Mouse Wheel / +/- — Zoom | 0 — Reset Zoom | . — Wait | E — Interact | I — Inventory | C — Crafting
             </div>
 
         </section>
@@ -203,7 +250,9 @@
 
 
     <script src="items.js"></script>
+    <script src="crafting.js"></script>
     <script src="nature.js"></script>
+    <script src="terrain.js"></script>
     <script src="script.js"></script>
 
 </body>

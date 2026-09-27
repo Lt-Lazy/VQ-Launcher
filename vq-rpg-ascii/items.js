@@ -65,7 +65,48 @@ window.ITEM_DATA = {
 
     stick: {
         name: "Stick",
+
+        description:
+            "A small piece of dry wood.",
+
         baseValue: 1,
-        tags: ["material", "wood"]
+
+        tags:
+            ["material", "wood"]
+    },
+
+
+    wood: {
+        name: "Wood",
+
+        description:
+            "A piece of usable wood cut from a tree.",
+
+        baseValue: 3,
+
+        tags:
+            ["material", "wood"]
+    },
+
+
+    stone_axe: {
+        name: "Stone Axe",
+
+        description:
+            "A crude axe with a stone head. Useful for chopping trees.",
+
+        baseValue: 10,
+
+        equipSlot:
+            "tool",
+
+        toolType:
+            "axe",
+
+        tags: [
+            "tool",
+            "axe",
+            "weapon"
+        ]
     }
 };

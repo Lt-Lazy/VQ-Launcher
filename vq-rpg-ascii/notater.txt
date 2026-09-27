@@ -9,4 +9,6 @@ people.filter(
 
 worldHistory.slice(-20)
 
-============================
+======PASS DAYS=============
+
+debugAdvanceDays(1)

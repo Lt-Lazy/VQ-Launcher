@@ -25,7 +25,7 @@ const minimapCtx =
 const WORLD_WIDTH = 300;
 const WORLD_HEIGHT = 300;
 
-const WORLD_SEED = 27252311;
+const WORLD_SEED = 295710422;
 
 /* =========================================================
    WORLD GENERATION SETTINGS
@@ -249,116 +249,18 @@ const MINIMAP_RADIUS =
    TILE DEFINITIONS
 ========================================================= */
 
-const TILES = {
+const TILES =
+    window.TERRAIN_DATA ??
+    {};
 
-    deepWater: {
-        char: "~",
-        color: "#28536b",
-        walkable: false
-    },
-
-    shallowWater: {
-        char: "~",
-        color: "#3d7891",
-        walkable: false
-    },
-
-    beach: {
-        char: ".",
-        color: "#c6b978",
-        walkable: true
-    },
-
-    grass: {
-        char: ".",
-        color: "#78955e",
-        walkable: true
-    },
-
-    grassDark: {
-        char: ",",
-        color: "#526e47",
-        walkable: true
-    },
-
-    dryGrass: {
-        char: "'",
-        color: "#a59b58",
-        walkable: true
-    },
-
-    desert: {
-        char: ".",
-        color: "#c7ad61",
-        walkable: true
-    },
-
-    tundra: {
-        char: ".",
-        color: "#9aa79b",
-        walkable: true
-    },
-
-    swamp: {
-        char: ";",
-        color: "#52745e",
-        walkable: true
-    },
-
-    tree: {
-        char: "♣",
-        color: "#4fa34f",
-        walkable: false
-    },
-
-    pine: {
-        char: "♠",
-        color: "#39744b",
-        walkable: false
-    },
-
-    hill: {
-        char: "^",
-        color: "#89866b",
-        walkable: true
-    },
-
-    mountain: {
-        char: "▲",
-        color: "#b0ada0",
-        walkable: false
-    }
-};
 
 /* =========================================================
    RIVER RENDERING
 ========================================================= */
 
-/*
-    Rivers er nå et overlay.
-
-    Det betyr at en tile fortsatt kan vite at
-    biomet under er grassland, tundra, swamp osv.
-*/
-
-const RIVER_STYLES = {
-
-    1: {
-        char: "≈",
-        color: "#4f94ad"
-    },
-
-    2: {
-        char: "≈",
-        color: "#65a9c0"
-    },
-
-    3: {
-        char: "≈",
-        color: "#83c4d3"
-    }
-
-};
+const RIVER_STYLES =
+    window.RIVER_STYLE_DATA ??
+    {};
 
 
 /* =========================================================
@@ -647,7 +549,19 @@ const player = {
 
     coins: 50,
 
-    inventory: {}
+    inventory: {},
+
+    equipment: {
+
+        tool:
+            null,
+
+        weapon:
+            null,
+
+        armor:
+            null
+    }
 };
 
 
@@ -1008,6 +922,18 @@ function registerItem(
                 definition.name ??
                 itemId,
 
+            description:
+                definition.description ??
+                "",
+
+            equipSlot:
+                definition.equipSlot ??
+                null,
+
+            toolType:
+                definition.toolType ??
+                null,
+
             baseValue:
                 Math.max(
                     1,
@@ -1090,6 +1016,787 @@ function registerConfiguredItems() {
 
 
 registerConfiguredItems();
+
+/* =========================================================
+   CRAFTING RECIPE DEFINITIONS
+========================================================= */
+
+const CRAFTING_RECIPES =
+    new Map();
+
+
+function registerCraftingRecipe(
+    recipeId,
+    definition = {}
+) {
+
+    const ingredients =
+
+        Array.isArray(
+            definition.ingredients
+        )
+
+            ? definition.ingredients
+
+                .filter(
+                    ingredient =>
+
+                        ingredient &&
+                        ingredient.itemId
+                )
+
+                .map(
+                    ingredient => ({
+
+                        itemId:
+                            ingredient.itemId,
+
+                        amount:
+
+                            Math.max(
+                                1,
+
+                                Math.floor(
+                                    Number(
+                                        ingredient.amount ??
+                                        1
+                                    )
+                                )
+                            )
+                    })
+                )
+
+            : [];
+
+
+    const output =
+        definition.output ?? {};
+
+
+    CRAFTING_RECIPES.set(
+
+        recipeId,
+
+        {
+            id:
+                recipeId,
+
+            name:
+                definition.name ??
+                recipeId,
+
+            category:
+                definition.category ??
+                "Misc",
+
+            ingredients,
+
+            output: {
+
+                itemId:
+                    output.itemId ??
+                    null,
+
+                amount:
+
+                    Math.max(
+                        1,
+
+                        Math.floor(
+                            Number(
+                                output.amount ??
+                                1
+                            )
+                        )
+                    )
+            },
+
+            minutes:
+
+                Math.max(
+                    1,
+
+                    Math.floor(
+                        Number(
+                            definition.minutes ??
+                            1
+                        )
+                    )
+                )
+        }
+    );
+}
+
+
+/* =========================================================
+   LOAD CRAFTING DATA
+========================================================= */
+
+function registerConfiguredCraftingRecipes() {
+
+    const configuredRecipes =
+        window.CRAFTING_RECIPE_DATA ??
+        {};
+
+
+    for (
+        const [
+            recipeId,
+            definition
+        ]
+        of Object.entries(
+            configuredRecipes
+        )
+    ) {
+
+        registerCraftingRecipe(
+            recipeId,
+            definition
+        );
+    }
+}
+
+
+registerConfiguredCraftingRecipes();
+
+
+function getCraftingRecipe(
+    recipeId
+) {
+
+    return (
+
+        CRAFTING_RECIPES.get(
+            recipeId
+        ) ||
+
+        null
+    );
+}
+
+/* =========================================================
+   CRAFTING AVAILABILITY
+========================================================= */
+
+function canPlayerCraftRecipe(
+    recipe
+) {
+
+    if (!recipe) {
+
+        return false;
+    }
+
+
+    if (
+        !recipe.output ||
+        !recipe.output.itemId
+    ) {
+
+        return false;
+    }
+
+
+    /*
+        Output-item må eksistere.
+    */
+
+    if (
+        !getItemDefinition(
+            recipe.output.itemId
+        )
+    ) {
+
+        return false;
+    }
+
+
+    /*
+        Alle ingredients må finnes
+        i riktig mengde.
+    */
+
+    for (
+        const ingredient
+        of recipe.ingredients
+    ) {
+
+        if (
+            getItemAmount(
+                player,
+                ingredient.itemId
+            ) <
+            ingredient.amount
+        ) {
+
+            return false;
+        }
+    }
+
+
+    return true;
+}
+
+
+function getCraftableRecipes() {
+
+    return Array.from(
+        CRAFTING_RECIPES.values()
+    )
+
+        .filter(
+            recipe =>
+                canPlayerCraftRecipe(
+                    recipe
+                )
+        )
+
+        .sort(
+            (
+                a,
+                b
+            ) =>
+
+                a.name.localeCompare(
+                    b.name
+                )
+        );
+}
+
+/* =========================================================
+   CRAFT ITEM
+========================================================= */
+
+function craftRecipe(
+    recipeId
+) {
+
+    const recipe =
+        getCraftingRecipe(
+            recipeId
+        );
+
+
+    if (
+        !recipe ||
+        !canPlayerCraftRecipe(
+            recipe
+        )
+    ) {
+
+        return false;
+    }
+
+
+    const outputItem =
+        getItemDefinition(
+            recipe.output.itemId
+        );
+
+
+    if (!outputItem) {
+
+        console.error(
+            `Unknown crafting output: ${recipe.output.itemId}`
+        );
+
+        return false;
+    }
+
+
+    /*
+        Hold styr på det vi fjerner.
+
+        Hvis noe uventet feiler,
+        kan materials gis tilbake.
+    */
+
+    const removedIngredients =
+        [];
+
+
+    for (
+        const ingredient
+        of recipe.ingredients
+    ) {
+
+        const removed =
+            removeItemFromInventory(
+
+                player,
+
+                ingredient.itemId,
+
+                ingredient.amount
+            );
+
+
+        if (!removed) {
+
+            /*
+                Rollback.
+            */
+
+            for (
+                const previous
+                of removedIngredients
+            ) {
+
+                addItemToInventory(
+
+                    player,
+
+                    previous.itemId,
+
+                    previous.amount
+                );
+            }
+
+
+            return false;
+        }
+
+
+        removedIngredients.push({
+
+            itemId:
+                ingredient.itemId,
+
+            amount:
+                ingredient.amount
+        });
+    }
+
+
+    /*
+        Gi output.
+    */
+
+    const added =
+        addItemToInventory(
+
+            player,
+
+            recipe.output.itemId,
+
+            recipe.output.amount
+        );
+
+
+    if (!added) {
+
+        /*
+            Rollback ingredients hvis output
+            av en eller annen grunn feiler.
+        */
+
+        for (
+            const ingredient
+            of removedIngredients
+        ) {
+
+            addItemToInventory(
+
+                player,
+
+                ingredient.itemId,
+
+                ingredient.amount
+            );
+        }
+
+
+        return false;
+    }
+
+
+    addLog(
+
+        `You craft ${
+            recipe.output.amount
+        } ${
+            outputItem.name
+        }.`
+    );
+
+
+    finishTurn(
+
+        `craft:${recipe.id}`,
+
+        recipe.minutes
+    );
+
+
+    return true;
+}
+
+/* =========================================================
+   CRAFTING WINDOW
+========================================================= */
+
+let craftingWindowOpen =
+    false;
+
+
+function isCraftingWindowOpen() {
+
+    return craftingWindowOpen;
+}
+
+
+function openCraftingWindow() {
+
+    /*
+        Bare ett hovedvindu skal være åpent.
+    */
+
+    closeSettlementWindow();
+
+    closeInteractionWindow();
+
+    closeInventoryWindow();
+
+
+    craftingWindowOpen =
+        true;
+
+
+    const windowElement =
+        document.getElementById(
+            "crafting-window"
+        );
+
+
+    windowElement.classList.remove(
+        "hidden"
+    );
+
+
+    windowElement.setAttribute(
+        "aria-hidden",
+        "false"
+    );
+
+
+    renderCraftingWindow();
+}
+
+
+function closeCraftingWindow() {
+
+    craftingWindowOpen =
+        false;
+
+
+    const windowElement =
+        document.getElementById(
+            "crafting-window"
+        );
+
+
+    if (!windowElement) {
+
+        return;
+    }
+
+
+    windowElement.classList.add(
+        "hidden"
+    );
+
+
+    windowElement.setAttribute(
+        "aria-hidden",
+        "true"
+    );
+}
+
+/* =========================================================
+   RENDER CRAFTING WINDOW
+========================================================= */
+
+function renderCraftingWindow() {
+
+    if (
+        !craftingWindowOpen
+    ) {
+
+        return;
+    }
+
+
+    const recipes =
+        getCraftableRecipes();
+
+
+    const content =
+        document.getElementById(
+            "crafting-window-content"
+        );
+
+
+    const recipesHTML =
+
+        recipes.length > 0
+
+            ? recipes.map(
+                recipe => {
+
+                    const outputItem =
+                        getItemDefinition(
+                            recipe.output.itemId
+                        );
+
+
+                    const ingredientsText =
+
+                        recipe.ingredients
+
+                            .map(
+                                ingredient => {
+
+                                    const item =
+                                        getItemDefinition(
+                                            ingredient.itemId
+                                        );
+
+
+                                    return (
+
+                                        `${ingredient.amount} × ${
+                                            item
+                                                ? item.name
+                                                : ingredient.itemId
+                                        }`
+                                    );
+                                }
+                            )
+
+                            .join(
+                                " | "
+                            );
+
+
+                    return `
+
+                        <div class="inventory-item">
+
+                            <div class="inventory-item-main">
+
+                                <div>
+                                    ${escapeHTML(
+                                        recipe.name
+                                    )}
+                                </div>
+
+
+                                <div class="settlement-list-detail">
+                                    Requires:
+                                    ${escapeHTML(
+                                        ingredientsText
+                                    )}
+                                </div>
+
+
+                                <div class="settlement-list-detail">
+                                    Creates:
+                                    ${recipe.output.amount}
+                                    ×
+                                    ${escapeHTML(
+                                        outputItem
+                                            ? outputItem.name
+                                            : recipe.output.itemId
+                                    )}
+                                </div>
+
+
+                                <div class="settlement-list-detail">
+                                    Time:
+                                    ${recipe.minutes}
+                                    minutes
+                                </div>
+
+                            </div>
+
+
+                            <div class="inventory-item-actions">
+
+                                <button
+                                    type="button"
+                                    class="inventory-action-button"
+                                    data-crafting-action="craft"
+                                    data-recipe-id="${escapeHTML(
+                                        recipe.id
+                                    )}"
+                                >
+                                    Craft
+                                </button>
+
+                            </div>
+
+                        </div>
+                    `;
+                }
+            ).join("")
+
+            : `
+
+                <div class="settlement-list-detail">
+                    You do not currently have the materials
+                    for any known recipe.
+                </div>
+            `;
+
+
+    content.innerHTML = `
+
+        <div class="settlement-list-detail">
+            Only recipes you currently have the
+            materials to craft are shown.
+        </div>
+
+
+        <div class="settlement-section">
+
+            <div class="settlement-section-title">
+                AVAILABLE RECIPES
+            </div>
+
+            ${recipesHTML}
+
+        </div>
+    `;
+}
+
+/* =========================================================
+   PLAYER EQUIPMENT
+========================================================= */
+
+function resetPlayerEquipment() {
+
+    player.equipment = {
+
+        tool:
+            null,
+
+        weapon:
+            null,
+
+        armor:
+            null
+    };
+}
+
+function getEquippedItem(
+    slotId
+) {
+
+    if (
+        !player.equipment
+    ) {
+
+        return null;
+    }
+
+
+    const itemId =
+        player.equipment[
+            slotId
+        ];
+
+
+    if (!itemId) {
+
+        return null;
+    }
+
+
+    const item =
+        getItemDefinition(
+            itemId
+        );
+
+
+    /*
+        Dersom itemet av en eller annen grunn
+        ikke lenger finnes i inventory,
+        rydder vi equipment-slot automatisk.
+    */
+
+    if (
+        !item ||
+        getItemAmount(
+            player,
+            itemId
+        ) <= 0
+    ) {
+
+        player.equipment[
+            slotId
+        ] = null;
+
+        return null;
+    }
+
+
+    return item;
+}
+
+
+function getPlayerEquippedSlotForItem(
+    itemId
+) {
+
+    if (
+        !player.equipment
+    ) {
+
+        return null;
+    }
+
+
+    for (
+        const [
+            slotId,
+            equippedItemId
+        ]
+        of Object.entries(
+            player.equipment
+        )
+    ) {
+
+        if (
+            equippedItemId ===
+            itemId
+        ) {
+
+            return slotId;
+        }
+    }
+
+
+    return null;
+}
+
+
+function hasEquippedToolType(
+    toolType
+) {
+
+    const tool =
+        getEquippedItem(
+            "tool"
+        );
+
+
+    return (
+
+        tool !== null &&
+        tool.toolType ===
+            toolType
+    );
+}
 
 /* =========================================================
    ITEM EFFECTS
@@ -1361,6 +2068,156 @@ registerItemAction(
     }
 );
 
+/* =========================================================
+   EQUIP ITEM
+========================================================= */
+
+registerItemAction(
+
+    "equip",
+
+    {
+        label:
+            "Equip",
+
+        minutes:
+            1,
+
+
+        isAvailable:
+            (
+                item,
+                context
+            ) => {
+
+                if (
+                    !item.equipSlot ||
+                    context.amount <= 0
+                ) {
+
+                    return false;
+                }
+
+
+                return (
+
+                    player.equipment[
+                        item.equipSlot
+                    ] !==
+                    item.id
+                );
+            },
+
+
+        execute:
+            (
+                item
+            ) => {
+
+                if (
+                    !item.equipSlot
+                ) {
+
+                    return false;
+                }
+
+
+                player.equipment[
+                    item.equipSlot
+                ] =
+                    item.id;
+
+
+                addLog(
+                    `You equip ${item.name}.`
+                );
+
+
+                return true;
+            }
+    }
+);
+
+
+/* =========================================================
+   UNEQUIP ITEM
+========================================================= */
+
+registerItemAction(
+
+    "unequip",
+
+    {
+        label:
+            "Unequip",
+
+        minutes:
+            1,
+
+
+        isAvailable:
+            (
+                item
+            ) => {
+
+                if (
+                    !item.equipSlot
+                ) {
+
+                    return false;
+                }
+
+
+                return (
+
+                    player.equipment[
+                        item.equipSlot
+                    ] ===
+                    item.id
+                );
+            },
+
+
+        execute:
+            (
+                item
+            ) => {
+
+                if (
+                    !item.equipSlot
+                ) {
+
+                    return false;
+                }
+
+
+                if (
+                    player.equipment[
+                        item.equipSlot
+                    ] !==
+                    item.id
+                ) {
+
+                    return false;
+                }
+
+
+                player.equipment[
+                    item.equipSlot
+                ] =
+                    null;
+
+
+                addLog(
+                    `You unequip ${item.name}.`
+                );
+
+
+                return true;
+            }
+    }
+);
+
 function performItemAction(
     actionId,
     itemId
@@ -1470,6 +2327,7 @@ function openInventoryWindow() {
 
     closeInteractionWindow();
 
+    closeCraftingWindow();
 
     inventoryWindowOpen =
         true;
@@ -1638,6 +2496,11 @@ function renderInventoryWindow() {
                             entry.item
                         );
 
+                    const equippedSlot =
+                        getPlayerEquippedSlotForItem(
+                            entry.item.id
+                        );
+
 
                     const actions =
                         getAvailableItemActions(
@@ -1674,6 +2537,14 @@ function renderInventoryWindow() {
                                 <div>
                                     ${escapeHTML(entry.item.name)}
                                     x${entry.amount}
+
+                                    ${
+                                        equippedSlot
+
+                                            ? " — EQUIPPED"
+
+                                            : ""
+                                    }
                                 </div>
 
                                 ${
@@ -1945,11 +2816,20 @@ function removeItemFromInventory(
     }
 
 
+    /*
+        Faktisk fjern items.
+    */
+
     entity.inventory[
         itemId
     ] -=
         amount;
 
+
+    /*
+        Hvis stacken er tom,
+        fjernes itemet helt.
+    */
 
     if (
         entity.inventory[
@@ -1960,6 +2840,38 @@ function removeItemFromInventory(
         delete entity.inventory[
             itemId
         ];
+
+
+        /*
+            Hvis player ikke lenger har itemet,
+            kan det heller ikke være equipped.
+        */
+
+        if (
+            entity === player &&
+            player.equipment
+        ) {
+
+            for (
+                const slotId
+                of Object.keys(
+                    player.equipment
+                )
+            ) {
+
+                if (
+                    player.equipment[
+                        slotId
+                    ] === itemId
+                ) {
+
+                    player.equipment[
+                        slotId
+                    ] =
+                        null;
+                }
+            }
+        }
     }
 
 
@@ -3971,6 +4883,7 @@ function openSettlementWindow(
 
     closeInventoryWindow();
 
+    closeCraftingWindow();
 
     discoverEntity(
         "settlement",
@@ -6008,6 +6921,546 @@ function getWorldObjectById(
     );
 }
 
+/* =========================================================
+   TERRAIN INTERACTION HELPERS
+========================================================= */
+
+function createTerrainTargetId(
+    x,
+    y
+) {
+
+    return `${x},${y}`;
+}
+
+
+function parseTerrainTargetId(
+    targetId
+) {
+
+    if (
+        typeof targetId !==
+        "string"
+    ) {
+
+        return null;
+    }
+
+
+    const parts =
+        targetId.split(",");
+
+
+    if (
+        parts.length !== 2
+    ) {
+
+        return null;
+    }
+
+
+    const x =
+        Number(
+            parts[0]
+        );
+
+    const y =
+        Number(
+            parts[1]
+        );
+
+
+    if (
+        !Number.isInteger(x) ||
+        !Number.isInteger(y) ||
+        !isInsideWorld(x, y)
+    ) {
+
+        return null;
+    }
+
+
+    return {
+        x,
+        y
+    };
+}
+
+
+/* =========================================================
+   GET INTERACTABLE TERRAIN
+========================================================= */
+
+function getTerrainInteractionAt(
+    x,
+    y,
+    includeUninspectable = false
+) {
+
+    const tile =
+        getTile(
+            x,
+            y
+        );
+
+
+    if (!tile) {
+
+        return null;
+    }
+
+
+    /*
+        River er et overlay og skal derfor
+        ha prioritet over terrain under.
+    */
+
+    if (
+        tile.river
+    ) {
+
+        const definition =
+
+            RIVER_STYLES[
+                tile.riverSize
+            ] ||
+
+            RIVER_STYLES[1];
+
+
+        if (!definition) {
+
+            return null;
+        }
+
+
+        if (
+            !includeUninspectable &&
+            definition.inspectable ===
+                false
+        ) {
+
+            return null;
+        }
+
+
+        return {
+
+            kind:
+                "river",
+
+            x,
+            y,
+
+            definition,
+
+            tile
+        };
+    }
+
+
+    const definition =
+        TILES[
+            tile.type
+        ];
+
+
+    if (!definition) {
+
+        return null;
+    }
+
+
+    /*
+        Vanlige nearby terrain må eksplisitt
+        være interessante.
+
+        "Here" kan derimot overstyre dette,
+        slik at spilleren alltid kan undersøke
+        bakken han faktisk står på.
+    */
+
+    if (
+        !includeUninspectable &&
+        definition.inspectable !==
+            true
+    ) {
+
+        return null;
+    }
+
+
+    return {
+
+        kind:
+            "terrain",
+
+        x,
+        y,
+
+        definition,
+
+        tile
+    };
+}
+
+/* =========================================================
+   TERRAIN ACTION AVAILABILITY
+========================================================= */
+
+function getTerrainActionAvailability(
+    terrain
+) {
+
+    if (
+        !terrain ||
+        !terrain.definition
+    ) {
+
+        return {
+
+            available:
+                false,
+
+            reason:
+                ""
+        };
+    }
+
+
+    const action =
+        terrain.definition
+            .action;
+
+
+    if (!action) {
+
+        return {
+
+            available:
+                false,
+
+            reason:
+                ""
+        };
+    }
+
+
+    /*
+        Tool requirement.
+    */
+
+    if (
+        action.requiredToolType &&
+        !hasEquippedToolType(
+            action.requiredToolType
+        )
+    ) {
+
+        return {
+
+            available:
+                false,
+
+            reason:
+
+                `Requires equipped: ${
+                    action.requiredToolLabel ??
+                    action.requiredToolType
+                }`
+        };
+    }
+
+
+    return {
+
+        available:
+            true,
+
+        reason:
+            ""
+    };
+}
+
+
+/* =========================================================
+   PERFORM TERRAIN ACTION
+========================================================= */
+
+function performTerrainAction(
+    targetId
+) {
+
+    const coordinates =
+        parseTerrainTargetId(
+            targetId
+        );
+
+
+    if (!coordinates) {
+
+        return false;
+    }
+
+
+    const terrain =
+        getTerrainInteractionAt(
+
+            coordinates.x,
+            coordinates.y,
+
+            true
+        );
+
+
+    if (!terrain) {
+
+        return false;
+    }
+
+
+    const definition =
+        terrain.definition;
+
+    const action =
+        definition.action;
+
+
+    if (!action) {
+
+        return false;
+    }
+
+
+    /*
+        Target må fortsatt være innenfor
+        interaction distance.
+
+        Interaction-systemet tillater diagonals,
+        derfor bruker vi Chebyshev distance.
+    */
+
+    const distance =
+
+        Math.max(
+
+            Math.abs(
+                coordinates.x -
+                player.x
+            ),
+
+            Math.abs(
+                coordinates.y -
+                player.y
+            )
+        );
+
+
+    if (
+        distance > 1
+    ) {
+
+        addLog(
+            `${definition.name} is too far away.`
+        );
+
+        return false;
+    }
+
+
+    const availability =
+        getTerrainActionAvailability(
+            terrain
+        );
+
+
+    if (
+        !availability.available
+    ) {
+
+        if (
+            availability.reason
+        ) {
+
+            addLog(
+                availability.reason
+            );
+        }
+
+
+        return false;
+    }
+
+
+    /*
+        Foreløpig første generic terrain action:
+        harvest terrain.
+    */
+
+    if (
+        action.type !==
+        "harvest_terrain"
+    ) {
+
+        console.warn(
+            `Unknown terrain action: ${action.type}`
+        );
+
+        return false;
+    }
+
+
+    const outputItem =
+        getItemDefinition(
+            action.outputItemId
+        );
+
+
+    if (!outputItem) {
+
+        console.error(
+            `Unknown terrain output item: ${action.outputItemId}`
+        );
+
+        return false;
+    }
+
+
+    const minimum =
+
+        Math.max(
+            1,
+
+            Math.floor(
+                Number(
+                    action.minAmount ??
+                    1
+                )
+            )
+        );
+
+
+    const maximum =
+
+        Math.max(
+
+            minimum,
+
+            Math.floor(
+                Number(
+                    action.maxAmount ??
+                    minimum
+                )
+            )
+        );
+
+
+    const amount =
+        randomInteger(
+
+            simulationRandom,
+
+            minimum,
+            maximum
+        );
+
+
+    /*
+        Finn hvilken terrain-type som skal
+        ligge under etter harvesting.
+    */
+
+    const replacements =
+        action.replacementByBiome ??
+        {};
+
+
+    const replacementType =
+
+        replacements[
+            terrain.tile.biome
+        ] ??
+
+        replacements.default ??
+
+
+        "grass";
+
+
+    if (
+        !TILES[
+            replacementType
+        ]
+    ) {
+
+        console.error(
+            `Unknown replacement terrain: ${replacementType}`
+        );
+
+        return false;
+    }
+
+
+    /*
+        Legg item i inventory før verden endres.
+
+        Hvis inventory-handlingen skulle feile,
+        mister vi ikke treet.
+    */
+
+    if (
+        !addItemToInventory(
+
+            player,
+
+            outputItem.id,
+
+            amount
+        )
+    ) {
+
+        return false;
+    }
+
+
+    /*
+        Endre selve verdenen.
+    */
+
+    terrain.tile.type =
+        replacementType;
+
+
+    const actionMinutes =
+
+        Math.max(
+            1,
+
+            Math.floor(
+                Number(
+                    action.minutes ??
+                    1
+                )
+            )
+        );
+
+
+    addLog(
+
+        `You ${action.label.toLowerCase()} and collect ${amount} ${outputItem.name}.`
+    );
+
+
+    finishTurn(
+
+        `terrain:${action.type}`,
+
+        actionMinutes
+    );
+
+
+    return true;
+}
 
 /*
     Interaction order.
@@ -6375,13 +7828,67 @@ function getNearbyInteractionTargets() {
         [];
 
 
-    /*
-        Natural objects.
+    /* =========================================
+       HERE — TERRAIN
 
-        Her inkluderer vi også depleted objects.
-        Spilleren skal fortsatt kunne inspecte
-        en tom berry bush.
-    */
+       Playerens egen tile skal ALLTID
+       kunne inspiseres.
+    ========================================= */
+
+    const hereTerrain =
+        getTerrainInteractionAt(
+
+            player.x,
+            player.y,
+
+            true
+        );
+
+
+    if (hereTerrain) {
+
+        const definition =
+            hereTerrain.definition;
+
+
+        targets.push({
+
+            targetType:
+                "terrain",
+
+            targetId:
+                createTerrainTargetId(
+                    player.x,
+                    player.y
+                ),
+
+            name:
+                definition.name,
+
+            char:
+                definition.char,
+
+            x:
+                player.x,
+
+            y:
+                player.y,
+
+            isHere:
+                true,
+
+            detail:
+                "Here — Terrain"
+        });
+    }
+
+
+    /* =========================================
+       NATURAL OBJECTS
+
+       Objects kan finnes både på playerens
+       tile og på tiles rundt spilleren.
+    ========================================= */
 
     for (
         const offset
@@ -6422,6 +7929,15 @@ function getNearbyInteractionTargets() {
         }
 
 
+        const isHere =
+
+            object.x ===
+                player.x &&
+
+            object.y ===
+                player.y;
+
+
         targets.push({
 
             targetType:
@@ -6449,6 +7965,8 @@ function getNearbyInteractionTargets() {
             y:
                 object.y,
 
+            isHere,
+
             detail:
 
                 `${getInteractionDirectionLabel(
@@ -6463,12 +7981,97 @@ function getNearbyInteractionTargets() {
     }
 
 
-    /*
-        Settlement.
+    /* =========================================
+       NEARBY TERRAIN
 
-        Vi bruker eksisterende
-        settlement interaction radius.
-    */
+       Ikke inkluder playerens egen tile her.
+       Den har allerede fått sin egen
+       obligatoriske HERE-entry ovenfor.
+
+       Bare terrain som faktisk er markert
+       inspectable blir vist rundt spilleren.
+    ========================================= */
+
+    for (
+        const offset
+        of WORLD_OBJECT_INTERACTION_OFFSETS
+    ) {
+
+        /*
+            Skip HERE.
+        */
+
+        if (
+            offset.x === 0 &&
+            offset.y === 0
+        ) {
+
+            continue;
+        }
+
+
+        const x =
+            player.x +
+            offset.x;
+
+        const y =
+            player.y +
+            offset.y;
+
+
+        const terrain =
+            getTerrainInteractionAt(
+                x,
+                y
+            );
+
+
+        if (!terrain) {
+
+            continue;
+        }
+
+
+        const definition =
+            terrain.definition;
+
+
+        targets.push({
+
+            targetType:
+                "terrain",
+
+            targetId:
+                createTerrainTargetId(
+                    x,
+                    y
+                ),
+
+            name:
+                definition.name,
+
+            char:
+                definition.char,
+
+            x,
+            y,
+
+            isHere:
+                false,
+
+            detail:
+
+                `${getInteractionDirectionLabel(
+                    x,
+                    y
+                )} — Terrain`
+        });
+    }
+
+
+    /* =========================================
+       SETTLEMENT
+    ========================================= */
 
     const settlement =
         getNearbySettlement();
@@ -6476,7 +8079,16 @@ function getNearbyInteractionTargets() {
 
     if (settlement) {
 
-        targets.unshift({
+        const isHere =
+
+            settlement.x ===
+                player.x &&
+
+            settlement.y ===
+                player.y;
+
+
+        targets.push({
 
             targetType:
                 "settlement",
@@ -6495,6 +8107,8 @@ function getNearbyInteractionTargets() {
 
             y:
                 settlement.y,
+
+            isHere,
 
             detail:
 
@@ -6524,6 +8138,7 @@ function openInteractionWindow() {
 
     closeSettlementWindow();
 
+    closeCraftingWindow();
 
     const targets =
         getNearbyInteractionTargets();
@@ -6667,24 +8282,27 @@ function renderInteractionTargetList() {
         );
 
 
-    if (
-        targets.length === 0
+    const hereTargets =
+        targets.filter(
+            target =>
+                target.isHere ===
+                true
+        );
+
+
+    const nearbyTargets =
+        targets.filter(
+            target =>
+                target.isHere !==
+                true
+        );
+
+
+    function renderTargetButtons(
+        entries
     ) {
 
-        content.innerHTML = `
-
-            <div class="settlement-list-detail">
-                There is nothing nearby to inspect.
-            </div>
-        `;
-
-        return;
-    }
-
-
-    const targetHTML =
-
-        targets.map(
+        return entries.map(
             target => `
 
                 <button
@@ -6718,15 +8336,52 @@ function renderInteractionTargetList() {
                 </button>
             `
         ).join("");
+    }
+
+
+    const hereHTML =
+        renderTargetButtons(
+            hereTargets
+        );
+
+
+    const nearbyHTML =
+        renderTargetButtons(
+            nearbyTargets
+        );
 
 
     content.innerHTML = `
 
-        <div class="settlement-section-title">
-            NEARBY
+        <div class="settlement-section">
+
+            <div class="settlement-section-title">
+                HERE
+            </div>
+
+            ${hereHTML}
+
         </div>
 
-        ${targetHTML}
+
+        ${
+            nearbyTargets.length > 0
+
+                ? `
+
+                    <div class="settlement-section">
+
+                        <div class="settlement-section-title">
+                            NEARBY
+                        </div>
+
+                        ${nearbyHTML}
+
+                    </div>
+                `
+
+                : ""
+        }
     `;
 }
 
@@ -6983,6 +8638,268 @@ function renderInteractionInspect() {
         return;
     }
 
+    /*
+        =========================================
+        TERRAIN
+        =========================================
+    */
+
+    if (
+        targetType ===
+        "terrain"
+    ) {
+
+        const coordinates =
+            parseTerrainTargetId(
+                targetId
+            );
+
+
+        if (!coordinates) {
+
+            interactionWindowState.view =
+                "list";
+
+            renderInteractionWindow();
+
+            return;
+        }
+
+
+        const terrain =
+            getTerrainInteractionAt(
+
+                coordinates.x,
+                coordinates.y,
+
+                true
+            );
+
+
+        if (!terrain) {
+
+            interactionWindowState.view =
+                "list";
+
+            renderInteractionWindow();
+
+            return;
+        }
+
+
+        const definition =
+            terrain.definition;
+
+        const tile =
+            terrain.tile;
+
+
+        document.getElementById(
+            "interaction-window-title"
+        ).textContent =
+
+            definition.name
+                .toUpperCase();
+
+
+        const biomeLabel =
+
+            tile.biome
+
+                ? formatWorldLabel(
+                    tile.biome
+                )
+
+                : "Unknown";
+
+
+        const walkableLabel =
+
+            terrain.kind ===
+            "river"
+
+                ? "No"
+
+                : definition.walkable
+
+                    ? "Yes"
+
+                    : "No";
+
+
+        let terrainActionHTML =
+            "";
+
+
+        if (
+            definition.action
+        ) {
+
+            const action =
+                definition.action;
+
+
+            const availability =
+                getTerrainActionAvailability(
+                    terrain
+                );
+
+
+            if (
+                availability.available
+            ) {
+
+                terrainActionHTML = `
+
+                    <div class="settlement-section">
+
+                        <div class="settlement-section-title">
+                            ACTIONS
+                        </div>
+
+                        <button
+                            type="button"
+                            class="settlement-action-button"
+                            data-interaction-action="terrain-action"
+                        >
+                            ${escapeHTML(
+                                action.label ??
+                                "Use"
+                            )}
+                        </button>
+
+                    </div>
+                `;
+
+            } else {
+
+                terrainActionHTML = `
+
+                    <div class="settlement-section">
+
+                        <div class="settlement-section-title">
+                            ACTIONS
+                        </div>
+
+                        <button
+                            type="button"
+                            class="settlement-action-button"
+                            disabled
+                        >
+                            ${escapeHTML(
+                                action.label ??
+                                "Use"
+                            )}
+                        </button>
+
+                        <div class="settlement-list-detail">
+                            ${escapeHTML(
+                                availability.reason
+                            )}
+                        </div>
+
+                    </div>
+                `;
+            }
+        }
+
+        content.innerHTML = `
+
+            <button
+                type="button"
+                class="settlement-back-button"
+                data-interaction-action="back"
+            >
+                &lt; Back
+            </button>
+
+
+            <div class="settlement-section">
+
+                <div class="settlement-row">
+
+                    <span>
+                        Symbol
+                    </span>
+
+                    <span>
+                        ${escapeHTML(
+                            definition.char
+                        )}
+                    </span>
+
+                </div>
+
+
+                <div class="settlement-row">
+
+                    <span>
+                        Location
+                    </span>
+
+                    <span>
+                        ${escapeHTML(
+                            getInteractionDirectionLabel(
+                                coordinates.x,
+                                coordinates.y
+                            )
+                        )}
+                    </span>
+
+                </div>
+
+
+                <div class="settlement-row">
+
+                    <span>
+                        Biome
+                    </span>
+
+                    <span>
+                        ${escapeHTML(
+                            biomeLabel
+                        )}
+                    </span>
+
+                </div>
+
+
+                <div class="settlement-row">
+
+                    <span>
+                        Passable
+                    </span>
+
+                    <span>
+                        ${walkableLabel}
+                    </span>
+
+                </div>
+
+            </div>
+
+
+            <div class="settlement-section">
+
+                <div class="settlement-section-title">
+                    INSPECT
+                </div>
+
+                <div>
+                    ${escapeHTML(
+                        definition.description
+                    )}
+                </div>
+
+            </div>
+
+
+            ${terrainActionHTML}
+        `;
+
+
+        return;
+    }
 
     /*
         =========================================
@@ -17102,6 +19019,29 @@ window.addEventListener(
             return;
         }
 
+        /*
+            Crafting window fungerer som modal.
+        */
+
+        if (
+            isCraftingWindowOpen()
+        ) {
+
+            if (
+                key === "escape" ||
+                key === "c"
+            ) {
+
+                event.preventDefault();
+
+                closeCraftingWindow();
+
+                return;
+            }
+
+
+            return;
+        }
 
         /*
             World interaction.
@@ -17114,6 +19054,17 @@ window.addEventListener(
             event.preventDefault();
 
             interactWithWorld();
+
+            return;
+        }
+
+        if (
+            key === "c"
+        ) {
+
+            event.preventDefault();
+
+            openCraftingWindow();
 
             return;
         }
@@ -17276,6 +19227,29 @@ function updateUI() {
 
         `${Math.round(player.hunger)} (${hungerState.label})`;
 
+    const equippedTool =
+        getEquippedItem(
+            "tool"
+        );
+
+
+    const toolValue =
+        document.getElementById(
+            "tool-value"
+        );
+
+
+    if (toolValue) {
+
+        toolValue.textContent =
+
+            equippedTool
+
+                ? equippedTool.name
+
+                : "None";
+    }
+
     document.getElementById(
         "coins-value"
     ).textContent =
@@ -17376,6 +19350,8 @@ function startGame() {
 
     closeInteractionWindow();
 
+    closeCraftingWindow();
+
     resetWorldTime();
 
     resetWorldHistory();
@@ -17383,6 +19359,8 @@ function startGame() {
     resetSimulationRandom();
 
     resetPlayerEconomy();
+
+    resetPlayerEquipment();
 
     resetPlayerSurvival();
 
@@ -17476,6 +19454,12 @@ document.getElementById(
     openInventoryWindow
 );
 
+document.getElementById(
+    "crafting-button"
+).addEventListener(
+    "click",
+    openCraftingWindow
+);
 
 document.getElementById(
     "close-inventory-window"
@@ -17484,6 +19468,74 @@ document.getElementById(
     closeInventoryWindow
 );
 
+document.getElementById(
+    "close-crafting-window"
+).addEventListener(
+    "click",
+    closeCraftingWindow
+);
+
+document.getElementById(
+    "crafting-window-content"
+).addEventListener(
+
+    "click",
+
+    event => {
+
+        const button =
+            event.target.closest(
+                "[data-crafting-action]"
+            );
+
+
+        if (!button) {
+
+            return;
+        }
+
+
+        const action =
+            button.dataset
+                .craftingAction;
+
+
+        if (
+            action !==
+            "craft"
+        ) {
+
+            return;
+        }
+
+
+        const recipeId =
+            button.dataset
+                .recipeId;
+
+
+        const success =
+            craftRecipe(
+                recipeId
+            );
+
+
+        if (!success) {
+
+            renderCraftingWindow();
+
+            return;
+        }
+
+
+        /*
+            Recipe kan forsvinne fra listen
+            hvis vi ikke lenger har materials.
+        */
+
+        renderCraftingWindow();
+    }
+);
 
 document.getElementById(
     "inventory-window-content"
@@ -17807,6 +19859,65 @@ document.getElementById(
             return;
         }
 
+        /*
+            =====================================
+            TERRAIN ACTION
+            =====================================
+        */
+
+        if (
+            action ===
+            "terrain-action"
+        ) {
+
+            if (
+                interactionWindowState
+                    .targetType !==
+                "terrain"
+            ) {
+
+                return;
+            }
+
+
+            const success =
+                performTerrainAction(
+
+                    interactionWindowState
+                        .targetId
+                );
+
+
+            if (!success) {
+
+                renderInteractionWindow();
+
+                return;
+            }
+
+
+            /*
+                Terrain kan ha endret seg fullstendig.
+
+                Et tree kan f.eks. nå være grass,
+                så vi går tilbake til interaction-listen.
+            */
+
+            interactionWindowState.view =
+                "list";
+
+            interactionWindowState.targetType =
+                null;
+
+            interactionWindowState.targetId =
+                null;
+
+
+            renderInteractionWindow();
+
+
+            return;
+        }
 
         /*
             =====================================

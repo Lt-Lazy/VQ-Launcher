@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>ASCII RPG</title>
+
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <main id="game-layout">
+
+        <!-- CHARACTER -->
+        <aside class="panel" id="character-panel">
+            <h2>CHARACTER</h2>
+
+            <div class="panel-content">
+                <p id="character-name">Erik</p>
+
+                <p>
+                    HP:
+                    <span id="hp-value">100/100</span>
+                </p>
+
+                <p>
+                    Hunger:
+                    <span id="hunger-value">100</span>
+                </p>
+
+                <hr>
+
+                <p>
+                    Weapon:
+                    <span id="weapon-value">Fists</span>
+                </p>
+
+                <hr>
+
+                <p>
+                    Position:
+                    <span id="position-value">0, 0</span>
+                </p>
+
+                <p>
+                    Turn:
+                    <span id="turn-value">0</span>
+                </p>
+
+                <hr>
+
+                <p>
+                    Time:
+                    <span id="time-value">08:00</span>
+                </p>
+
+                <p>
+                    Date:
+                    <span id="date-value">01 January 520</span>
+                </p>
+
+            </div>
+        </aside>
+
+
+        <!-- GAME -->
+        <section class="panel game-panel">
+
+            <div class="game-header">
+                <span id="world-name">THE WILDS</span>
+                <span id="seed-display"></span>
+            </div>
+
+            <canvas id="game-canvas"></canvas>
+
+            <div
+                id="settlement-window"
+                class="game-window hidden"
+                aria-hidden="true"
+            >
+                <div class="game-window-header">
+
+                    <span id="settlement-window-title">
+                        SETTLEMENT
+                    </span>
+
+                    <button
+                        id="close-settlement-window"
+                        class="game-window-close"
+                        type="button"
+                    >
+                        X
+                    </button>
+
+                </div>
+
+                <div
+                    id="settlement-window-content"
+                    class="game-window-content"
+                ></div>
+            </div>
+
+            <div id="controls">
+                WASD / Arrow Keys — Move | . — Wait | E — Interact
+            </div>
+
+        </section>
+
+
+        <!-- LOG -->
+        <aside class="panel" id="log-panel">
+            <h2>LOG</h2>
+
+            <div id="game-log"></div>
+        </aside>
+
+    </main>
+
+
+    <script src="script.js"></script>
+</body>
+</html>

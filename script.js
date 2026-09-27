@@ -41,7 +41,7 @@ const games = [
         description:
             "A retro open world adventure with exploration, dungeons, combat and old-school RPG mechanics.",
 
-        path: "./VQ-rpg/",
+        path: "./vq-rpg-ascii/",
 
         image: "",
 
@@ -97,6 +97,17 @@ const games = [
 
 
 const news = [
+
+    {
+        date: "27 SEP 2026, 01:51 (UTC+2)",
+
+        game: "Void Quest RPG",
+
+        title: "Change log",
+
+        text:
+            "Further decisions with the voidquest team have changed the direction if vq rpg's visuals. The game is now being developed in ascii graphics to spare time one making visual graphics. This is to keep the comlexity of the game as a priority. Take a look at the games development progress on the games tab and click play on VQ RPG."
+    },
 
     {
         date: "21 SEP 2026, 12:45 (UTC+2)",

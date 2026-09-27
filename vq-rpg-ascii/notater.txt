@@ -1,0 +1,12 @@
+======Total befolkning======
+
+people.filter(
+    person =>
+        person.alive
+).length
+
+======WORLD EVENTS==========
+
+worldHistory.slice(-20)
+
+============================

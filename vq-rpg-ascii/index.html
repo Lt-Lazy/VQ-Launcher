@@ -40,6 +40,23 @@
                 <hr>
 
                 <p>
+                    Coins:
+                    <span id="coins-value">50</span>
+                </p>
+
+                <hr>
+
+                <button
+                    id="inventory-button"
+                    class="character-action-button"
+                    type="button"
+                >
+                    INVENTORY [I]
+                </button>
+
+                <hr>
+
+                <p>
                     Position:
                     <span id="position-value">0, 0</span>
                 </p>
@@ -68,12 +85,51 @@
         <!-- GAME -->
         <section class="panel game-panel">
 
+            <div
+                id="interaction-window"
+                class="game-window hidden"
+                aria-hidden="true"
+            >
+
+                <div class="game-window-header">
+
+                    <span id="interaction-window-title">
+                        INTERACT
+                    </span>
+
+                    <button
+                        id="close-interaction-window"
+                        class="game-window-close"
+                        type="button"
+                    >
+                        X
+                    </button>
+
+                </div>
+
+                <div
+                    id="interaction-window-content"
+                    class="game-window-content"
+                ></div>
+
+            </div>
+
             <div class="game-header">
                 <span id="world-name">THE WILDS</span>
                 <span id="seed-display"></span>
             </div>
 
             <canvas id="game-canvas"></canvas>
+
+            <div id="minimap-panel" aria-label="Local map">
+                <div id="minimap-title">LOCAL MAP</div>
+
+                <canvas
+                    id="minimap-canvas"
+                    width="180"
+                    height="180"
+                ></canvas>
+            </div>
 
             <div
                 id="settlement-window"
@@ -102,8 +158,35 @@
                 ></div>
             </div>
 
+            <div
+                id="inventory-window"
+                class="game-window hidden"
+                aria-hidden="true"
+            >
+                <div class="game-window-header">
+
+                    <span>
+                        INVENTORY
+                    </span>
+
+                    <button
+                        id="close-inventory-window"
+                        class="game-window-close"
+                        type="button"
+                    >
+                        X
+                    </button>
+
+                </div>
+
+                <div
+                    id="inventory-window-content"
+                    class="game-window-content"
+                ></div>
+            </div>
+
             <div id="controls">
-                WASD / Arrow Keys — Move | . — Wait | E — Interact
+                WASD / Arrows — Move | Mouse Wheel / +/- — Zoom | 0 — Reset Zoom | . — Wait | E — Interact | I — Inventory
             </div>
 
         </section>
@@ -119,6 +202,9 @@
     </main>
 
 
+    <script src="items.js"></script>
+    <script src="nature.js"></script>
     <script src="script.js"></script>
+
 </body>
 </html>

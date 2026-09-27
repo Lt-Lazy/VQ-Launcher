@@ -8,6 +8,15 @@
 const canvas = document.getElementById("game-canvas");
 const ctx = canvas.getContext("2d");
 
+const minimapCanvas =
+    document.getElementById(
+        "minimap-canvas"
+    );
+
+const minimapCtx =
+    minimapCanvas.getContext(
+        "2d"
+    );
 
 /* =========================================================
    WORLD SETTINGS
@@ -76,9 +85,165 @@ const MAJOR_RIVER_FLOW_THRESHOLD = 3000;
 
     Disse bestemmer hvor mye plass hvert tegn får.
 */
-const CELL_WIDTH = 14;
-const CELL_HEIGHT = 18;
+/* =========================================================
+   CAMERA ZOOM
+========================================================= */
 
+const BASE_CELL_WIDTH =
+    14;
+
+const BASE_CELL_HEIGHT =
+    18;
+
+
+/*
+    Vi bruker faste zoom levels i stedet for
+    helt fri scaling.
+
+    Det gjør ASCII-tegnene mer stabile og
+    hindrer rare mellomstørrelser.
+*/
+
+const CAMERA_ZOOM_LEVELS = [
+
+    1.20,
+    1.45,
+    1.75,
+    2.10
+];
+
+
+const DEFAULT_CAMERA_ZOOM_INDEX =
+    1;
+
+
+let cameraZoomIndex =
+    DEFAULT_CAMERA_ZOOM_INDEX;
+
+
+let CELL_WIDTH =
+    Math.round(
+        BASE_CELL_WIDTH *
+        CAMERA_ZOOM_LEVELS[
+            cameraZoomIndex
+        ]
+    );
+
+let CELL_HEIGHT =
+    Math.round(
+        BASE_CELL_HEIGHT *
+        CAMERA_ZOOM_LEVELS[
+            cameraZoomIndex
+        ]
+    );
+
+
+function getCameraZoom() {
+
+    return CAMERA_ZOOM_LEVELS[
+        cameraZoomIndex
+    ];
+}
+
+
+function applyCameraZoom() {
+
+    const zoom =
+        getCameraZoom();
+
+
+    CELL_WIDTH =
+
+        Math.max(
+            6,
+            Math.round(
+                BASE_CELL_WIDTH *
+                zoom
+            )
+        );
+
+
+    CELL_HEIGHT =
+
+        Math.max(
+            8,
+            Math.round(
+                BASE_CELL_HEIGHT *
+                zoom
+            )
+        );
+
+
+    updateUI();
+
+    render();
+}
+
+
+function changeCameraZoom(
+    direction
+) {
+
+    const previousIndex =
+        cameraZoomIndex;
+
+
+    cameraZoomIndex =
+
+        Math.max(
+
+            0,
+
+            Math.min(
+
+                CAMERA_ZOOM_LEVELS.length - 1,
+
+                cameraZoomIndex +
+                direction
+            )
+        );
+
+
+    /*
+        Allerede på minimum / maximum.
+    */
+
+    if (
+        cameraZoomIndex ===
+        previousIndex
+    ) {
+
+        return;
+    }
+
+
+    applyCameraZoom();
+}
+
+
+function resetCameraZoom() {
+
+    cameraZoomIndex =
+        DEFAULT_CAMERA_ZOOM_INDEX;
+
+
+    applyCameraZoom();
+}
+
+/* =========================================================
+   MINIMAP SETTINGS
+========================================================= */
+
+/*
+    44 tiles i hver retning + player tile =
+    et lokalt kart på 89 x 89 world tiles.
+
+    Minimap viser geografi og kjente settlements.
+    Creatures, NPC-er og items skal IKKE vises her.
+*/
+
+const MINIMAP_RADIUS =
+    44;
 
 /* =========================================================
    TILE DEFINITIONS
@@ -201,6 +366,151 @@ const RIVER_STYLES = {
 ========================================================= */
 
 let world = [];
+
+/* =========================================================
+   WORLD OBJECTS
+========================================================= */
+
+let worldObjects =
+    [];
+
+
+const WORLD_OBJECT_DEFINITIONS =
+    new Map();
+
+
+function registerWorldObjectDefinition(
+    objectId,
+    definition = {}
+) {
+
+    WORLD_OBJECT_DEFINITIONS.set(
+
+        objectId,
+
+        {
+            id:
+                objectId,
+
+            name:
+                definition.name ??
+                objectId,
+
+            description:
+                definition.description ??
+                "",
+
+            depletedDescription:
+                definition.depletedDescription ??
+                definition.description ??
+                "",
+
+            char:
+                definition.char ??
+                "?",
+
+            color:
+                definition.color ??
+                "#ffffff",
+
+            depletedChar:
+                definition.depletedChar ??
+                definition.char ??
+                "?",
+
+            depletedColor:
+                definition.depletedColor ??
+                definition.color ??
+                "#777777",
+
+            spawn:
+                {
+                    ...(
+                        definition.spawn ??
+                        {}
+                    ),
+
+                    biomes:
+                        Array.isArray(
+                            definition.spawn
+                                ?.biomes
+                        )
+
+                            ? [
+                                ...definition
+                                    .spawn
+                                    .biomes
+                            ]
+
+                            : [],
+
+                    tileTypes:
+                        Array.isArray(
+                            definition.spawn
+                                ?.tileTypes
+                        )
+
+                            ? [
+                                ...definition
+                                    .spawn
+                                    .tileTypes
+                            ]
+
+                            : []
+                },
+
+            gather:
+                definition.gather
+
+                    ? {
+                        ...definition.gather
+                    }
+
+                    : null
+        }
+    );
+}
+
+
+function getWorldObjectDefinition(
+    objectType
+) {
+
+    return (
+        WORLD_OBJECT_DEFINITIONS.get(
+            objectType
+        ) ||
+        null
+    );
+}
+
+
+function registerConfiguredWorldObjects() {
+
+    const configuredObjects =
+        window.NATURE_OBJECT_DATA ??
+        {};
+
+
+    for (
+        const [
+            objectId,
+            definition
+        ]
+        of Object.entries(
+            configuredObjects
+        )
+    ) {
+
+        registerWorldObjectDefinition(
+            objectId,
+            definition
+        );
+    }
+}
+
+
+registerConfiguredWorldObjects();
 
 
 /* =========================================================
@@ -333,7 +643,11 @@ const player = {
     hp: 100,
     maxHp: 100,
 
-    hunger: 100
+    hunger: 100,
+
+    coins: 50,
+
+    inventory: {}
 };
 
 
@@ -658,6 +972,2498 @@ function discoverEntity(
 
 
     return true;
+}
+
+function resetPlayerEconomy() {
+
+    player.coins =
+        50;
+
+    player.inventory =
+        {};
+}
+
+/* =========================================================
+   ITEM DEFINITIONS
+========================================================= */
+
+const ITEM_DEFINITIONS =
+    new Map();
+
+
+function registerItem(
+    itemId,
+    definition = {}
+) {
+
+    ITEM_DEFINITIONS.set(
+
+        itemId,
+
+        {
+            id:
+                itemId,
+
+            name:
+                definition.name ??
+                itemId,
+
+            baseValue:
+                Math.max(
+                    1,
+                    Number(
+                        definition.baseValue ?? 1
+                    )
+                ),
+
+            foodValue:
+                Math.max(
+                    0,
+                    Number(
+                        definition.foodValue ?? 0
+                    )
+                ),
+
+            tags:
+                Array.isArray(
+                    definition.tags
+                )
+                    ? [...definition.tags]
+                    : [],
+
+            effects:
+                Array.isArray(
+                    definition.effects
+                )
+                    ? definition.effects.map(
+                        effect => ({
+                            ...effect
+                        })
+                    )
+                    : [],
+
+            tradable:
+                definition.tradable !== false
+        }
+    );
+}
+
+
+function getItemDefinition(
+    itemId
+) {
+
+    return (
+        ITEM_DEFINITIONS.get(
+            itemId
+        ) ||
+        null
+    );
+}
+
+/* =========================================================
+   LOAD ITEM DATA
+========================================================= */
+
+function registerConfiguredItems() {
+
+    const configuredItems =
+        window.ITEM_DATA ?? {};
+
+
+    for (
+        const [
+            itemId,
+            definition
+        ]
+        of Object.entries(
+            configuredItems
+        )
+    ) {
+
+        registerItem(
+            itemId,
+            definition
+        );
+    }
+}
+
+
+registerConfiguredItems();
+
+/* =========================================================
+   ITEM EFFECTS
+========================================================= */
+
+const itemEffectHandlers =
+    new Map();
+
+
+function registerItemEffect(
+    effectType,
+    handler
+) {
+
+    if (
+        typeof handler !==
+        "function"
+    ) {
+
+        return;
+    }
+
+
+    itemEffectHandlers.set(
+        effectType,
+        handler
+    );
+}
+
+
+function applyItemEffects(
+    item,
+    context = {}
+) {
+
+    if (
+        !item ||
+        !Array.isArray(
+            item.effects
+        )
+    ) {
+
+        return false;
+    }
+
+
+    let appliedAnything =
+        false;
+
+
+    for (
+        const effect
+        of item.effects
+    ) {
+
+        const handler =
+            itemEffectHandlers.get(
+                effect.type
+            );
+
+
+        if (!handler) {
+
+            console.warn(
+                `Unknown item effect: ${effect.type}`
+            );
+
+            continue;
+        }
+
+
+        const applied =
+            handler(
+                context,
+                effect
+            );
+
+
+        if (
+            applied !== false
+        ) {
+
+            appliedAnything =
+                true;
+        }
+    }
+
+
+    return appliedAnything;
+}
+
+registerItemEffect(
+
+    "hunger",
+
+    (
+        context,
+        effect
+    ) => {
+
+        const target =
+            context.target;
+
+
+        if (
+            !target ||
+            !Number.isFinite(
+                target.hunger
+            )
+        ) {
+
+            return false;
+        }
+
+
+        target.hunger =
+
+            Math.max(
+
+                0,
+
+                Math.min(
+
+                    100,
+
+                    target.hunger +
+                    Number(
+                        effect.amount ?? 0
+                    )
+                )
+            );
+
+
+        return true;
+    }
+);
+
+/* =========================================================
+   ITEM ACTION REGISTRY
+========================================================= */
+
+const itemActionDefinitions =
+    new Map();
+
+
+function registerItemAction(
+    actionId,
+    definition = {}
+) {
+
+    itemActionDefinitions.set(
+
+        actionId,
+
+        {
+            id:
+                actionId,
+
+            label:
+                definition.label ??
+                actionId,
+
+            minutes:
+                Math.max(
+                    0,
+                    Number(
+                        definition.minutes ?? 1
+                    )
+                ),
+
+            isAvailable:
+
+                typeof definition.isAvailable ===
+                "function"
+
+                    ? definition.isAvailable
+
+                    : () => true,
+
+            execute:
+
+                typeof definition.execute ===
+                "function"
+
+                    ? definition.execute
+
+                    : () => false
+        }
+    );
+}
+
+registerItemAction(
+
+    "eat",
+
+    {
+        label:
+            "Eat",
+
+        minutes:
+            2,
+
+
+        isAvailable:
+            (
+                item,
+                context
+            ) => {
+
+                return (
+
+                    item.tags.includes(
+                        "food"
+                    ) &&
+
+                    context.amount > 0
+                );
+            },
+
+
+        execute:
+            (
+                item,
+                context
+            ) => {
+
+                const applied =
+                    applyItemEffects(
+
+                        item,
+
+                        {
+                            target:
+                                player,
+
+                            source:
+                                player,
+
+                            item
+                        }
+                    );
+
+
+                if (!applied) {
+
+                    return false;
+                }
+
+
+                if (
+                    !removeItemFromInventory(
+                        player,
+                        item.id,
+                        1
+                    )
+                ) {
+
+                    return false;
+                }
+
+
+                addLog(
+                    `You eat ${item.name}.`
+                );
+
+
+                return true;
+            }
+    }
+);
+
+function performItemAction(
+    actionId,
+    itemId
+) {
+
+    const action =
+        itemActionDefinitions.get(
+            actionId
+        );
+
+
+    const item =
+        getItemDefinition(
+            itemId
+        );
+
+
+    if (
+        !action ||
+        !item
+    ) {
+
+        return;
+    }
+
+
+    const amount =
+        getItemAmount(
+            player,
+            itemId
+        );
+
+
+    const context = {
+
+        player,
+
+        item,
+
+        amount
+    };
+
+
+    if (
+        !action.isAvailable(
+            item,
+            context
+        )
+    ) {
+
+        return;
+    }
+
+
+    const success =
+        action.execute(
+            item,
+            context
+        );
+
+
+    if (!success) {
+
+        return;
+    }
+
+
+    /*
+        Item-action bruker den vanlige
+        world clocken.
+    */
+
+    finishTurn(
+
+        `item:${actionId}`,
+
+        action.minutes
+    );
+
+
+    updateUI();
+
+    renderInventoryWindow();
+}
+
+/* =========================================================
+   INVENTORY WINDOW
+========================================================= */
+
+let inventoryWindowOpen =
+    false;
+
+
+function isInventoryWindowOpen() {
+
+    return inventoryWindowOpen;
+}
+
+
+function openInventoryWindow() {
+
+    /*
+        Bare ett hovedvindu åpent.
+    */
+
+    closeSettlementWindow();
+
+    closeInteractionWindow();
+
+
+    inventoryWindowOpen =
+        true;
+
+
+    document.getElementById(
+        "inventory-window"
+    ).classList.remove(
+        "hidden"
+    );
+
+
+    document.getElementById(
+        "inventory-window"
+    ).setAttribute(
+        "aria-hidden",
+        "false"
+    );
+
+
+    renderInventoryWindow();
+}
+
+
+function closeInventoryWindow() {
+
+    inventoryWindowOpen =
+        false;
+
+
+    const windowElement =
+        document.getElementById(
+            "inventory-window"
+        );
+
+
+    if (!windowElement) {
+
+        return;
+    }
+
+
+    windowElement.classList.add(
+        "hidden"
+    );
+
+
+    windowElement.setAttribute(
+        "aria-hidden",
+        "true"
+    );
+}
+
+function getItemEffectDescription(
+    item
+) {
+
+    if (
+        !item.effects ||
+        item.effects.length === 0
+    ) {
+
+        return "";
+    }
+
+
+    const parts =
+        [];
+
+
+    for (
+        const effect
+        of item.effects
+    ) {
+
+        if (
+            effect.type ===
+            "hunger"
+        ) {
+
+            parts.push(
+                `Restores ${effect.amount} hunger`
+            );
+        }
+    }
+
+
+    return parts.join(
+        " | "
+    );
+}
+
+
+function getAvailableItemActions(
+    item,
+    amount
+) {
+
+    const context = {
+
+        player,
+
+        item,
+
+        amount
+    };
+
+
+    return Array.from(
+        itemActionDefinitions.values()
+    ).filter(
+        action => {
+
+            try {
+
+                return action.isAvailable(
+                    item,
+                    context
+                );
+
+            } catch (error) {
+
+                console.error(
+                    `Item action failed: ${action.id}`,
+                    error
+                );
+
+                return false;
+            }
+        }
+    );
+}
+
+
+function renderInventoryWindow() {
+
+    if (
+        !inventoryWindowOpen
+    ) {
+
+        return;
+    }
+
+
+    const entries =
+        getInventoryEntries(
+            player
+        );
+
+
+    const content =
+        document.getElementById(
+            "inventory-window-content"
+        );
+
+
+    const itemsHTML =
+
+        entries.length > 0
+
+            ? entries.map(
+                entry => {
+
+                    const description =
+                        getItemEffectDescription(
+                            entry.item
+                        );
+
+
+                    const actions =
+                        getAvailableItemActions(
+
+                            entry.item,
+
+                            entry.amount
+                        );
+
+
+                    const actionsHTML =
+
+                        actions.map(
+                            action => `
+
+                                <button
+                                    type="button"
+                                    class="inventory-action-button"
+                                    data-item-action="${escapeHTML(action.id)}"
+                                    data-item-id="${escapeHTML(entry.item.id)}"
+                                >
+                                    ${escapeHTML(action.label)}
+                                </button>
+                            `
+                        ).join("");
+
+
+                    return `
+
+                        <div class="inventory-item">
+
+                            <div class="inventory-item-main">
+
+                                <div>
+                                    ${escapeHTML(entry.item.name)}
+                                    x${entry.amount}
+                                </div>
+
+                                ${
+                                    description
+
+                                        ? `
+                                            <div class="settlement-list-detail">
+                                                ${escapeHTML(description)}
+                                            </div>
+                                        `
+
+                                        : ""
+                                }
+
+                            </div>
+
+                            <div class="inventory-item-actions">
+                                ${actionsHTML}
+                            </div>
+
+                        </div>
+                    `;
+                }
+            ).join("")
+
+            : `
+                <div class="settlement-list-detail">
+                    Your inventory is empty.
+                </div>
+            `;
+
+
+    content.innerHTML = `
+
+        <div class="inventory-summary">
+            Coins: ${player.coins}
+        </div>
+
+        <div class="settlement-section">
+
+            <div class="settlement-section-title">
+                ITEMS
+            </div>
+
+            ${itemsHTML}
+
+        </div>
+    `;
+}
+
+/* =========================================================
+   PLAYER SURVIVAL
+========================================================= */
+
+const PLAYER_SURVIVAL_RULES = {
+
+    hungerLossPerHour:
+        1.5,
+
+
+    hungerStates: [
+
+        {
+            id: "full",
+            min: 80,
+            label: "Full"
+        },
+
+        {
+            id: "satisfied",
+            min: 55,
+            label: "Satisfied"
+        },
+
+        {
+            id: "hungry",
+            min: 30,
+            label: "Hungry"
+        },
+
+        {
+            id: "very_hungry",
+            min: 10,
+            label: "Very hungry"
+        },
+
+        {
+            id: "starving",
+            min: 0,
+            label: "Starving"
+        }
+    ]
+};
+
+
+function getPlayerHungerState() {
+
+    for (
+        const state
+        of PLAYER_SURVIVAL_RULES
+            .hungerStates
+    ) {
+
+        if (
+            player.hunger >=
+            state.min
+        ) {
+
+            return state;
+        }
+    }
+
+
+    return PLAYER_SURVIVAL_RULES
+        .hungerStates[
+            PLAYER_SURVIVAL_RULES
+                .hungerStates.length - 1
+        ];
+}
+
+/* =========================================================
+   GENERIC INVENTORY
+========================================================= */
+
+function ensureEntityInventory(
+    entity
+) {
+
+    if (!entity) {
+
+        return false;
+    }
+
+
+    if (
+        !entity.inventory ||
+        typeof entity.inventory !==
+            "object"
+    ) {
+
+        entity.inventory =
+            {};
+    }
+
+
+    if (
+        !Number.isFinite(
+            entity.coins
+        )
+    ) {
+
+        entity.coins =
+            0;
+    }
+
+
+    return true;
+}
+
+
+function getItemAmount(
+    entity,
+    itemId
+) {
+
+    if (
+        !ensureEntityInventory(
+            entity
+        )
+    ) {
+
+        return 0;
+    }
+
+
+    return (
+        entity.inventory[
+            itemId
+        ] ||
+        0
+    );
+}
+
+
+function addItemToInventory(
+    entity,
+    itemId,
+    amount = 1
+) {
+
+    const item =
+        getItemDefinition(
+            itemId
+        );
+
+
+    if (
+        !item ||
+        !ensureEntityInventory(
+            entity
+        )
+    ) {
+
+        return false;
+    }
+
+
+    amount =
+        Math.floor(
+            amount
+        );
+
+
+    if (
+        amount <= 0
+    ) {
+
+        return false;
+    }
+
+
+    entity.inventory[
+        itemId
+    ] =
+
+        getItemAmount(
+            entity,
+            itemId
+        ) +
+
+        amount;
+
+
+    return true;
+}
+
+
+function removeItemFromInventory(
+    entity,
+    itemId,
+    amount = 1
+) {
+
+    if (
+        !ensureEntityInventory(
+            entity
+        )
+    ) {
+
+        return false;
+    }
+
+
+    amount =
+        Math.floor(
+            amount
+        );
+
+
+    if (
+        amount <= 0 ||
+        getItemAmount(
+            entity,
+            itemId
+        ) < amount
+    ) {
+
+        return false;
+    }
+
+
+    entity.inventory[
+        itemId
+    ] -=
+        amount;
+
+
+    if (
+        entity.inventory[
+            itemId
+        ] <= 0
+    ) {
+
+        delete entity.inventory[
+            itemId
+        ];
+    }
+
+
+    return true;
+}
+
+
+function transferItem(
+    from,
+    to,
+    itemId,
+    amount = 1
+) {
+
+    if (
+        !removeItemFromInventory(
+            from,
+            itemId,
+            amount
+        )
+    ) {
+
+        return false;
+    }
+
+
+    if (
+        !addItemToInventory(
+            to,
+            itemId,
+            amount
+        )
+    ) {
+
+        addItemToInventory(
+            from,
+            itemId,
+            amount
+        );
+
+        return false;
+    }
+
+
+    return true;
+}
+
+
+function getInventoryEntries(
+    entity,
+    options = {}
+) {
+
+    if (
+        !ensureEntityInventory(
+            entity
+        )
+    ) {
+
+        return [];
+    }
+
+
+    const tradableOnly =
+        options.tradableOnly ===
+        true;
+
+
+    return Object.entries(
+        entity.inventory
+    )
+
+        .filter(
+            ([itemId, amount]) => {
+
+                const item =
+                    getItemDefinition(
+                        itemId
+                    );
+
+
+                if (
+                    !item ||
+                    amount <= 0
+                ) {
+
+                    return false;
+                }
+
+
+                if (
+                    tradableOnly &&
+                    !item.tradable
+                ) {
+
+                    return false;
+                }
+
+
+                return true;
+            }
+        )
+
+        .map(
+            ([itemId, amount]) => ({
+
+                item:
+                    getItemDefinition(
+                        itemId
+                    ),
+
+                amount
+            })
+        )
+
+        .sort(
+            (a, b) =>
+
+                a.item.name.localeCompare(
+                    b.item.name
+                )
+        );
+}
+
+/* =========================================================
+   PROFESSION DEFINITIONS
+========================================================= */
+
+const PROFESSION_DEFINITIONS =
+    new Map();
+
+
+function registerProfession(
+    professionId,
+    definition = {}
+) {
+
+    PROFESSION_DEFINITIONS.set(
+
+        professionId,
+
+        {
+            id:
+                professionId,
+
+            name:
+                definition.name ??
+                professionId,
+
+            outputItemId:
+                definition.outputItemId ??
+                null,
+
+            resourceKey:
+                definition.resourceKey ??
+                null,
+
+            baseDailyOutput:
+                Math.max(
+                    0,
+                    Number(
+                        definition.baseDailyOutput ?? 0
+                    )
+                ),
+
+            targetShare:
+                Math.max(
+                    0,
+                    Number(
+                        definition.targetShare ?? 0
+                    )
+                ),
+
+            minimumWorkers:
+                Math.max(
+                    0,
+                    Math.floor(
+                        definition.minimumWorkers ?? 0
+                    )
+                ),
+
+            minimumPotential:
+                Math.max(
+                    0,
+                    Number(
+                        definition.minimumPotential ?? 0
+                    )
+                )
+        }
+    );
+}
+
+
+function getProfessionDefinition(
+    professionId
+) {
+
+    return (
+        PROFESSION_DEFINITIONS.get(
+            professionId
+        ) ||
+        null
+    );
+}
+
+/* =========================================================
+   STARTING PROFESSIONS
+========================================================= */
+
+registerProfession(
+    "farmer",
+    {
+        name:
+            "Farmer",
+
+        outputItemId:
+            "bread",
+
+        resourceKey:
+            "fertility",
+
+        baseDailyOutput:
+            1.4,
+
+        targetShare:
+            0.10,
+
+        minimumWorkers:
+            2,
+
+        minimumPotential:
+            0.10
+    }
+);
+
+
+registerProfession(
+    "forager",
+    {
+        name:
+            "Forager",
+
+        outputItemId:
+            "berries",
+
+        resourceKey:
+            "fertility",
+
+        baseDailyOutput:
+            0.9,
+
+        targetShare:
+            0.025,
+
+        minimumWorkers:
+            1,
+
+        minimumPotential:
+            0.15
+    }
+);
+
+
+registerProfession(
+    "hunter",
+    {
+        name:
+            "Hunter",
+
+        outputItemId:
+            "dried_meat",
+
+        resourceKey:
+            "timber",
+
+        baseDailyOutput:
+            0.65,
+
+        targetShare:
+            0.025,
+
+        minimumWorkers:
+            1,
+
+        minimumPotential:
+            0.18
+    }
+);
+
+
+registerProfession(
+    "lumberjack",
+    {
+        name:
+            "Lumberjack",
+
+        outputItemId:
+            "timber_bundle",
+
+        resourceKey:
+            "timber",
+
+        baseDailyOutput:
+            0.9,
+
+        targetShare:
+            0.045,
+
+        minimumWorkers:
+            1,
+
+        minimumPotential:
+            0.15
+    }
+);
+
+
+registerProfession(
+    "stonecutter",
+    {
+        name:
+            "Stonecutter",
+
+        outputItemId:
+            "stone",
+
+        resourceKey:
+            "stone",
+
+        baseDailyOutput:
+            0.75,
+
+        targetShare:
+            0.025,
+
+        minimumWorkers:
+            0,
+
+        minimumPotential:
+            0.20
+    }
+);
+
+
+registerProfession(
+    "miner",
+    {
+        name:
+            "Miner",
+
+        outputItemId:
+            "iron_ore",
+
+        resourceKey:
+            "iron",
+
+        baseDailyOutput:
+            0.45,
+
+        targetShare:
+            0.018,
+
+        minimumWorkers:
+            0,
+
+        minimumPotential:
+            0.18
+    }
+);
+
+function getSettlementWorkers(
+    settlement,
+    professionId = null
+) {
+
+    return people.filter(
+        person => {
+
+            if (
+                !person.alive ||
+                person.settlementId !==
+                    settlement.id
+            ) {
+
+                return false;
+            }
+
+
+            if (
+                professionId !== null &&
+                person.profession !==
+                    professionId
+            ) {
+
+                return false;
+            }
+
+
+            return true;
+        }
+    );
+}
+
+
+function getAvailableSettlementWorkers(
+    settlement
+) {
+
+    return people.filter(
+        person => {
+
+            if (
+                !person.alive ||
+                person.settlementId !==
+                    settlement.id
+            ) {
+
+                return false;
+            }
+
+
+            /*
+                Barn og eldre får foreløpig
+                ingen normale professions.
+            */
+
+            if (
+                getPersonLifeStage(
+                    person
+                ) !== "adult"
+            ) {
+
+                return false;
+            }
+
+
+            /*
+                Allerede ansatt.
+                Merchant blir dermed automatisk
+                ekskludert.
+            */
+
+            if (
+                person.profession !==
+                null
+            ) {
+
+                return false;
+            }
+
+
+            return true;
+        }
+    );
+}
+
+function getProfessionTargetWorkers(
+    settlement,
+    profession
+) {
+
+    if (
+        !settlement ||
+        !profession
+    ) {
+
+        return 0;
+    }
+
+
+    const potential =
+
+        settlement.resources[
+            profession.resourceKey
+        ] ?? 0;
+
+
+    if (
+        potential <
+        profession.minimumPotential
+    ) {
+
+        return 0;
+    }
+
+
+    const population =
+        settlement.population;
+
+
+    const resourceMultiplier =
+
+        0.60 +
+
+        potential *
+        0.80;
+
+
+    const calculated =
+
+        Math.round(
+
+            population *
+
+            profession.targetShare *
+
+            resourceMultiplier
+        );
+
+
+    return Math.max(
+
+        profession.minimumWorkers,
+
+        calculated
+    );
+}
+
+function fillSettlementProfessionVacancies(
+    settlement,
+    random = simulationRandom
+) {
+
+    let available =
+        getAvailableSettlementWorkers(
+            settlement
+        );
+
+
+    /*
+        Litt tilfeldig fordeling gjør at
+        samme familie ikke alltid automatisk
+        får de samme jobbene.
+    */
+
+    available.sort(
+        () =>
+            random() - 0.5
+    );
+
+
+    for (
+        const profession
+        of PROFESSION_DEFINITIONS.values()
+    ) {
+
+        const target =
+            getProfessionTargetWorkers(
+
+                settlement,
+
+                profession
+            );
+
+
+        const current =
+            getSettlementWorkers(
+
+                settlement,
+
+                profession.id
+            ).length;
+
+
+        let vacancies =
+
+            Math.max(
+                0,
+                target - current
+            );
+
+
+        while (
+            vacancies > 0 &&
+            available.length > 0
+        ) {
+
+            const person =
+                available.pop();
+
+
+            person.profession =
+                profession.id;
+
+
+            vacancies--;
+        }
+
+
+        if (
+            available.length === 0
+        ) {
+
+            break;
+        }
+    }
+}
+
+function assignStartingProfessions(
+    random
+) {
+
+    for (
+        const settlement
+        of settlements
+    ) {
+
+        fillSettlementProfessionVacancies(
+            settlement,
+            random
+        );
+    }
+}
+
+/* =========================================================
+   SETTLEMENT FOOD / CONSUMPTION
+========================================================= */
+
+const SETTLEMENT_FOOD_RULES = {
+
+    dailyNeedByLifeStage: {
+
+        child:
+            0.65,
+
+        adult:
+            1.00,
+
+        elder:
+            0.85
+    },
+
+
+    /*
+        Merchant kan bare hente food fra
+        settlement storage dersom byen fortsatt
+        har denne mengden food i reserve.
+    */
+
+    merchantReserveDays:
+        2,
+
+
+    /*
+        Litt avrunding / hele items skal ikke
+        telle som en ekte shortage.
+    */
+
+    shortageCoverageThreshold:
+        0.95
+};
+
+
+function getItemFoodValue(
+    itemOrId
+) {
+
+    const item =
+
+        typeof itemOrId === "string"
+
+            ? getItemDefinition(
+                itemOrId
+            )
+
+            : itemOrId;
+
+
+    if (!item) {
+
+        return 0;
+    }
+
+
+    return Math.max(
+
+        0,
+
+        Number(
+            item.foodValue ?? 0
+        ) || 0
+    );
+}
+
+
+function getPersonDailyFoodNeed(
+    person
+) {
+
+    if (
+        !person ||
+        !person.alive
+    ) {
+
+        return 0;
+    }
+
+
+    const lifeStage =
+        getPersonLifeStage(
+            person
+        );
+
+
+    return (
+
+        SETTLEMENT_FOOD_RULES
+            .dailyNeedByLifeStage[
+                lifeStage
+            ] ??
+
+        SETTLEMENT_FOOD_RULES
+            .dailyNeedByLifeStage
+            .adult
+    );
+}
+
+
+function getSettlementDailyFoodNeed(
+    settlement
+) {
+
+    if (!settlement) {
+
+        return 0;
+    }
+
+
+    return getLivingSettlementResidents(
+        settlement
+    ).reduce(
+
+        (
+            total,
+            person
+        ) =>
+
+            total +
+            getPersonDailyFoodNeed(
+                person
+            ),
+
+        0
+    );
+}
+
+
+function getSettlementStoredFoodValue(
+    settlement
+) {
+
+    if (!settlement) {
+
+        return 0;
+    }
+
+
+    let total =
+        0;
+
+
+    for (
+        const entry
+        of getInventoryEntries(
+            settlement
+        )
+    ) {
+
+        const foodValue =
+            getItemFoodValue(
+                entry.item
+            );
+
+
+        if (
+            foodValue <= 0
+        ) {
+
+            continue;
+        }
+
+
+        total +=
+
+            entry.amount *
+            foodValue;
+    }
+
+
+    return total;
+}
+
+
+function getSettlementFoodStatus(
+    settlement
+) {
+
+    if (
+        !settlement ||
+        !settlement.foodSecurity
+    ) {
+
+        return "Unknown";
+    }
+
+
+    const foodSecurity =
+        settlement.foodSecurity;
+
+
+    if (
+        !foodSecurity.initialized
+    ) {
+
+        return "Not yet simulated";
+    }
+
+
+    const coverage =
+        foodSecurity.coverage;
+
+
+    if (
+        coverage < 0.25
+    ) {
+
+        return "Famine";
+    }
+
+
+    if (
+        coverage < 0.50
+    ) {
+
+        return "Severe shortage";
+    }
+
+
+    if (
+        coverage < 0.75
+    ) {
+
+        return "Shortage";
+    }
+
+
+    if (
+        coverage <
+        SETTLEMENT_FOOD_RULES
+            .shortageCoverageThreshold
+    ) {
+
+        return "Strained";
+    }
+
+
+    const dailyNeed =
+        getSettlementDailyFoodNeed(
+            settlement
+        );
+
+
+    const storedFood =
+        getSettlementStoredFoodValue(
+            settlement
+        );
+
+
+    const daysRemaining =
+
+        dailyNeed > 0
+
+            ? storedFood /
+                dailyNeed
+
+            : 0;
+
+
+    if (
+        daysRemaining >= 5
+    ) {
+
+        return "Well supplied";
+    }
+
+
+    if (
+        daysRemaining >= 2
+    ) {
+
+        return "Stable";
+    }
+
+
+    if (
+        daysRemaining >= 1
+    ) {
+
+        return "Low reserves";
+    }
+
+
+    return "Very low reserves";
+}
+
+
+function consumeSettlementFood(
+    settlement
+) {
+
+    if (!settlement) {
+
+        return null;
+    }
+
+
+    const dailyNeed =
+        getSettlementDailyFoodNeed(
+            settlement
+        );
+
+
+    const previousShortageDays =
+
+        settlement.foodSecurity
+            ?.shortageDays ?? 0;
+
+
+    if (
+        dailyNeed <= 0
+    ) {
+
+        settlement.foodSecurity = {
+
+            initialized:
+                true,
+
+            dailyNeed:
+                0,
+
+            consumed:
+                0,
+
+            coverage:
+                1,
+
+            shortageDays:
+                0
+        };
+
+
+        return settlement.foodSecurity;
+    }
+
+
+    let remainingNeed =
+        dailyNeed;
+
+
+    let consumedValue =
+        0;
+
+
+    /*
+        Lavere foodValue først.
+
+        Med dagens items betyr det:
+        berries -> bread -> dried meat.
+
+        Senere kan dette erstattes med
+        perishability / diet preferences.
+    */
+
+    const foodEntries =
+
+        getInventoryEntries(
+            settlement
+        )
+
+        .filter(
+            entry =>
+
+                getItemFoodValue(
+                    entry.item
+                ) > 0
+        )
+
+        .sort(
+            (a, b) =>
+
+                getItemFoodValue(
+                    a.item
+                ) -
+
+                getItemFoodValue(
+                    b.item
+                )
+        );
+
+
+    for (
+        const entry
+        of foodEntries
+    ) {
+
+        if (
+            remainingNeed <= 0
+        ) {
+
+            break;
+        }
+
+
+        const foodValue =
+            getItemFoodValue(
+                entry.item
+            );
+
+
+        const amountNeeded =
+
+            Math.ceil(
+                remainingNeed /
+                foodValue
+            );
+
+
+        const amountToConsume =
+
+            Math.min(
+                entry.amount,
+                amountNeeded
+            );
+
+
+        if (
+            amountToConsume <= 0
+        ) {
+
+            continue;
+        }
+
+
+        if (
+            !removeItemFromInventory(
+                settlement,
+                entry.item.id,
+                amountToConsume
+            )
+        ) {
+
+            continue;
+        }
+
+
+        const provided =
+
+            amountToConsume *
+            foodValue;
+
+
+        consumedValue +=
+            provided;
+
+
+        remainingNeed -=
+            provided;
+    }
+
+
+    const coverage =
+
+        Math.max(
+            0,
+            Math.min(
+                1,
+                consumedValue /
+                    dailyNeed
+            )
+        );
+
+
+    const shortage =
+
+        coverage <
+        SETTLEMENT_FOOD_RULES
+            .shortageCoverageThreshold;
+
+
+    settlement.foodSecurity = {
+
+        initialized:
+            true,
+
+        dailyNeed,
+
+        consumed:
+            Math.min(
+                dailyNeed,
+                consumedValue
+            ),
+
+        coverage,
+
+        shortageDays:
+
+            shortage
+
+                ? previousShortageDays + 1
+
+                : 0
+    };
+
+
+    return settlement.foodSecurity;
+}
+
+
+function getSettlementTradableAmount(
+    settlement,
+    itemId
+) {
+
+    const settlementAmount =
+        getItemAmount(
+            settlement,
+            itemId
+        );
+
+
+    if (
+        settlementAmount <= 0
+    ) {
+
+        return 0;
+    }
+
+
+    const item =
+        getItemDefinition(
+            itemId
+        );
+
+
+    const foodValue =
+        getItemFoodValue(
+            item
+        );
+
+
+    /*
+        Materials kan fortsatt flyttes normalt.
+    */
+
+    if (
+        foodValue <= 0
+    ) {
+
+        return settlementAmount;
+    }
+
+
+    const dailyNeed =
+        getSettlementDailyFoodNeed(
+            settlement
+        );
+
+
+    const reserveTarget =
+
+        dailyNeed *
+        SETTLEMENT_FOOD_RULES
+            .merchantReserveDays;
+
+
+    const storedFood =
+        getSettlementStoredFoodValue(
+            settlement
+        );
+
+
+    const surplusFood =
+
+        Math.max(
+            0,
+            storedFood -
+            reserveTarget
+        );
+
+
+    const maxFoodItems =
+
+        Math.floor(
+            surplusFood /
+            foodValue
+        );
+
+
+    return Math.min(
+        settlementAmount,
+        maxFoodItems
+    );
+}
+
+/* =========================================================
+   SETTLEMENT PRODUCTION
+========================================================= */
+
+function produceSettlementProfession(
+    settlement,
+    profession
+) {
+
+    const workers =
+        getSettlementWorkers(
+
+            settlement,
+
+            profession.id
+        );
+
+
+    if (
+        workers.length === 0
+    ) {
+
+        return 0;
+    }
+
+
+    const potential =
+
+        settlement.resources[
+            profession.resourceKey
+        ] ?? 0;
+
+
+    /*
+        Dårlig område kan fortsatt produsere,
+        men betydelig mindre.
+
+        Godt område gir høyere output.
+    */
+
+    const resourceMultiplier =
+
+        0.35 +
+
+        potential *
+        0.90;
+
+
+    const rawProduction =
+
+        workers.length *
+
+        profession.baseDailyOutput *
+
+        resourceMultiplier;
+
+
+    const itemId =
+        profession.outputItemId;
+
+
+    if (!itemId) {
+
+        return 0;
+    }
+
+
+    const previousRemainder =
+
+        settlement
+            .productionRemainders[
+                itemId
+            ] ?? 0;
+
+
+    const total =
+
+        rawProduction +
+        previousRemainder;
+
+
+    const wholeItems =
+        Math.floor(
+            total
+        );
+
+
+    settlement.productionRemainders[
+        itemId
+    ] =
+
+        total -
+        wholeItems;
+
+
+    if (
+        wholeItems > 0
+    ) {
+
+        addItemToInventory(
+
+            settlement,
+
+            itemId,
+
+            wholeItems
+        );
+    }
+
+
+    return wholeItems;
+}
+
+function simulateSettlementProductionDay() {
+
+    for (
+        const settlement
+        of settlements
+    ) {
+
+        /*
+            Fyll jobber som har blitt ledige
+            etter death / coming of age osv.
+        */
+
+        fillSettlementProfessionVacancies(
+            settlement,
+            simulationRandom
+        );
+
+
+        /*
+            1. Innbyggerne produserer dagens varer.
+        */
+
+        for (
+            const profession
+            of PROFESSION_DEFINITIONS.values()
+        ) {
+
+            produceSettlementProfession(
+
+                settlement,
+
+                profession
+            );
+        }
+
+
+        /*
+            2. Settlementet dekker eget matbehov.
+        */
+
+        consumeSettlementFood(
+            settlement
+        );
+
+
+        /*
+            3. Merchant får bare tilgang til
+            varer som kan flyttes etterpå.
+        */
+
+        restockSettlementMerchants(
+            settlement
+        );
+    }
+
+
+    if (
+        isSettlementWindowOpen()
+    ) {
+
+        renderSettlementWindow();
+    }
+}
+
+/* =========================================================
+   MERCHANT RESTOCK
+========================================================= */
+
+const MERCHANT_STOCK_TARGETS = {
+
+    bread:
+        24,
+
+    berries:
+        18,
+
+    dried_meat:
+        12,
+
+    timber_bundle:
+        16,
+
+    stone:
+        14,
+
+    iron_ore:
+        10
+};
+
+
+function restockSettlementMerchants(
+    settlement
+) {
+
+    const merchants =
+
+        getLivingSettlementResidents(
+            settlement
+        ).filter(
+
+            person =>
+
+                person.profession ===
+                    "merchant" &&
+
+                person.tradeProfile
+        );
+
+
+    if (
+        merchants.length === 0
+    ) {
+
+        return;
+    }
+
+
+    for (
+        const merchant
+        of merchants
+    ) {
+
+        for (
+            const [
+                itemId,
+                targetStock
+            ]
+            of Object.entries(
+                MERCHANT_STOCK_TARGETS
+            )
+        ) {
+
+            const merchantAmount =
+                getItemAmount(
+                    merchant,
+                    itemId
+                );
+
+
+            const settlementAmount =
+                getSettlementTradableAmount(
+                    settlement,
+                    itemId
+                );
+
+
+            const needed =
+
+                Math.max(
+
+                    0,
+
+                    targetStock -
+                    merchantAmount
+                );
+
+
+            const transferAmount =
+
+                Math.min(
+
+                    needed,
+
+                    settlementAmount
+                );
+
+
+            if (
+                transferAmount <= 0
+            ) {
+
+                continue;
+            }
+
+
+            transferItem(
+
+                settlement,
+
+                merchant,
+
+                itemId,
+
+                transferAmount
+            );
+        }
+    }
 }
 
 /* =========================================================
@@ -1161,6 +3967,10 @@ function openSettlementWindow(
         return;
     }
 
+    closeInteractionWindow();
+
+    closeInventoryWindow();
+
 
     discoverEntity(
         "settlement",
@@ -1276,6 +4086,62 @@ function renderSettlementOverview() {
             settlement
         );
 
+    const workforceRows =
+
+        Array.from(
+            PROFESSION_DEFINITIONS.values()
+        )
+
+        .map(
+            profession => {
+
+                const count =
+                    getSettlementWorkers(
+
+                        settlement,
+
+                        profession.id
+                    ).length;
+
+
+                if (
+                    count === 0
+                ) {
+
+                    return "";
+                }
+
+
+                return `
+                    <div class="settlement-row">
+
+                        <span>
+                            ${escapeHTML(
+                                profession.name
+                            )}
+                        </span>
+
+                        <span>
+                            ${count}
+                        </span>
+
+                    </div>
+                `;
+            }
+        )
+
+        .join("");
+
+    const merchantCount =
+
+        residents.filter(
+
+            person =>
+                person.profession ===
+                "merchant"
+
+        ).length;
+
 
     const livingFamilies =
         getLivingSettlementFamilies(
@@ -1295,6 +4161,31 @@ function renderSettlementOverview() {
 
         faction.capitalSettlementId ===
         settlement.id;
+
+    const dailyFoodNeed =
+        getSettlementDailyFoodNeed(
+            settlement
+        );
+
+
+    const storedFood =
+        getSettlementStoredFoodValue(
+            settlement
+        );
+
+
+    const foodDaysRemaining =
+
+        dailyFoodNeed > 0
+
+            ? storedFood /
+                dailyFoodNeed
+
+            : 0;
+
+
+    const foodSecurity =
+        settlement.foodSecurity;
 
 
     document.getElementById(
@@ -1476,6 +4367,118 @@ function renderSettlementOverview() {
 
         </div>
 
+        <div class="settlement-section">
+
+            <div class="settlement-section-title">
+                FOOD
+            </div>
+
+            <div class="settlement-row">
+                <span>Status</span>
+                <span>
+                    ${escapeHTML(
+                        getSettlementFoodStatus(
+                            settlement
+                        )
+                    )}
+                </span>
+            </div>
+
+            <div class="settlement-row">
+                <span>Stored food</span>
+                <span>
+                    ${storedFood.toFixed(1)} rations
+                </span>
+            </div>
+
+            <div class="settlement-row">
+                <span>Daily need</span>
+                <span>
+                    ${dailyFoodNeed.toFixed(1)} rations
+                </span>
+            </div>
+
+            <div class="settlement-row">
+                <span>Food remaining</span>
+                <span>
+                    ${
+                        dailyFoodNeed > 0
+
+                            ? `${foodDaysRemaining.toFixed(1)} days`
+
+                            : "—"
+                    }
+                </span>
+            </div>
+
+            <div class="settlement-row">
+                <span>Last daily coverage</span>
+                <span>
+                    ${
+                        foodSecurity &&
+                        foodSecurity.initialized
+
+                            ? `${Math.round(
+                                foodSecurity.coverage *
+                                100
+                            )}%`
+
+                            : "Not simulated"
+                    }
+                </span>
+            </div>
+
+            ${
+                foodSecurity &&
+                foodSecurity.shortageDays > 0
+
+                    ? `
+                        <div class="settlement-row">
+                            <span>Shortage duration</span>
+                            <span>
+                                ${foodSecurity.shortageDays} days
+                            </span>
+                        </div>
+                    `
+
+                    : ""
+            }
+
+        </div>
+
+        <div class="settlement-section">
+
+            <div class="settlement-section-title">
+                WORKFORCE
+            </div>
+
+        ${
+            merchantCount > 0
+
+                ? `
+                    <div class="settlement-row">
+                        <span>Merchant</span>
+                        <span>${merchantCount}</span>
+                    </div>
+                `
+
+                : ""
+        }
+
+        ${
+            workforceRows ||
+            (
+                merchantCount === 0
+                    ? `
+                        <div class="settlement-list-detail">
+                            No workers.
+                        </div>
+                    `
+                    : ""
+            )
+        }
+
+        </div>
 
         <div class="settlement-section">
 
@@ -1536,6 +4539,13 @@ function renderSettlementWindow() {
         case "talk":
 
             renderNpcDialogue();
+
+            break;
+
+
+        case "trade":
+
+            renderNpcTrade();
 
             break;
 
@@ -2913,16 +5923,615 @@ function goBackSettlementWindow() {
 }
 
 /* =========================================================
-   WORLD INTERACTION
+   NATURAL WORLD OBJECT HELPERS
 ========================================================= */
 
-function interactWithWorld() {
+function refreshWorldObjectState(
+    object
+) {
+
+    if (
+        !object ||
+        !object.depleted
+    ) {
+
+        return;
+    }
+
+
+    if (
+        object.regrowAtMinutes ===
+        null
+    ) {
+
+        return;
+    }
+
+
+    if (
+        worldTime.totalMinutes <
+        object.regrowAtMinutes
+    ) {
+
+        return;
+    }
+
+
+    object.depleted =
+        false;
+
+    object.regrowAtMinutes =
+        null;
+}
+
+
+function getWorldObjectAt(
+    x,
+    y
+) {
+
+    const object =
+
+        worldObjects.find(
+            candidate =>
+
+                candidate.x === x &&
+                candidate.y === y
+        ) ||
+        null;
+
+
+    if (object) {
+
+        refreshWorldObjectState(
+            object
+        );
+    }
+
+
+    return object;
+}
+
+function getWorldObjectById(
+    objectId
+) {
+
+    return (
+
+        worldObjects.find(
+            object =>
+                object.id ===
+                objectId
+        ) ||
+
+        null
+    );
+}
+
+
+/*
+    Interaction order.
+
+    Current tile først,
+    deretter cardinal directions,
+    deretter diagonals.
+*/
+
+const WORLD_OBJECT_INTERACTION_OFFSETS = [
+
+    { x:  0, y:  0 },
+
+    { x:  0, y: -1 },
+    { x:  1, y:  0 },
+    { x:  0, y:  1 },
+    { x: -1, y:  0 },
+
+    { x: -1, y: -1 },
+    { x:  1, y: -1 },
+    { x:  1, y:  1 },
+    { x: -1, y:  1 }
+];
+
+
+/* =========================================================
+   GATHER NATURAL OBJECT
+========================================================= */
+
+function gatherWorldObject(
+    object
+) {
+
+    if (!object) {
+
+        return false;
+    }
+
+
+    refreshWorldObjectState(
+        object
+    );
+
+
+    if (
+        object.depleted
+    ) {
+
+        return false;
+    }
+
+
+    const definition =
+        getWorldObjectDefinition(
+            object.type
+        );
+
+
+    if (
+        !definition ||
+        !definition.gather
+    ) {
+
+        return false;
+    }
+
+
+    const gather =
+        definition.gather;
+
+
+    const item =
+        getItemDefinition(
+            gather.itemId
+        );
+
+
+    if (!item) {
+
+        console.error(
+            `Unknown gather item: ${gather.itemId}`
+        );
+
+        return false;
+    }
+
+
+    const minimum =
+
+        Math.max(
+            1,
+
+            Math.floor(
+                Number(
+                    gather.minAmount ??
+                    1
+                )
+            )
+        );
+
+
+    const maximum =
+
+        Math.max(
+
+            minimum,
+
+            Math.floor(
+                Number(
+                    gather.maxAmount ??
+                    minimum
+                )
+            )
+        );
+
+
+    const amount =
+        randomInteger(
+
+            simulationRandom,
+
+            minimum,
+            maximum
+        );
+
+
+    if (
+        !addItemToInventory(
+            player,
+            item.id,
+            amount
+        )
+    ) {
+
+        return false;
+    }
+
+
+    const actionMinutes =
+
+        Math.max(
+            1,
+
+            Math.floor(
+                Number(
+                    gather.minutes ??
+                    1
+                )
+            )
+        );
+
+
+    /*
+        Permanent pickup.
+
+        Fallen branches og loose stones
+        forsvinner etter gathering.
+    */
+
+    if (
+        gather.removeAfterGather ===
+        true
+    ) {
+
+        const index =
+            worldObjects.indexOf(
+                object
+            );
+
+
+        if (
+            index >= 0
+        ) {
+
+            worldObjects.splice(
+                index,
+                1
+            );
+        }
+    }
+
+
+    /*
+        Renewable object.
+
+        Berry bushes blir depleted og
+        kommer tilbake senere.
+    */
+
+    else if (
+        Number(
+            gather.regrowMinutes
+        ) > 0
+    ) {
+
+        object.depleted =
+            true;
+
+
+        object.regrowAtMinutes =
+
+            worldTime.totalMinutes +
+
+            actionMinutes +
+
+            Number(
+                gather.regrowMinutes
+            );
+    }
+
+
+    addLog(
+        `You gather ${amount} ${item.name} from ${definition.name}.`
+    );
+
+
+    finishTurn(
+
+        `gather:${object.type}`,
+
+        actionMinutes
+    );
+
+
+    return true;
+}
+
+/* =========================================================
+   INTERACTION WINDOW STATE
+========================================================= */
+
+let interactionWindowOpen =
+    false;
+
+
+const interactionWindowState = {
+
+    view:
+        "list",
+
+    targetType:
+        null,
+
+    targetId:
+        null
+};
+
+
+function isInteractionWindowOpen() {
+
+    return interactionWindowOpen;
+}
+
+
+/* =========================================================
+   INTERACTION DIRECTION
+========================================================= */
+
+function getInteractionDirectionLabel(
+    x,
+    y
+) {
+
+    const dx =
+        x -
+        player.x;
+
+    const dy =
+        y -
+        player.y;
+
+
+    if (
+        dx === 0 &&
+        dy === 0
+    ) {
+
+        return "Here";
+    }
+
+
+    if (
+        dx === 0 &&
+        dy < 0
+    ) {
+
+        return "North";
+    }
+
+
+    if (
+        dx === 0 &&
+        dy > 0
+    ) {
+
+        return "South";
+    }
+
+
+    if (
+        dx > 0 &&
+        dy === 0
+    ) {
+
+        return "East";
+    }
+
+
+    if (
+        dx < 0 &&
+        dy === 0
+    ) {
+
+        return "West";
+    }
+
+
+    if (
+        dx > 0 &&
+        dy < 0
+    ) {
+
+        return "North-east";
+    }
+
+
+    if (
+        dx < 0 &&
+        dy < 0
+    ) {
+
+        return "North-west";
+    }
+
+
+    if (
+        dx > 0 &&
+        dy > 0
+    ) {
+
+        return "South-east";
+    }
+
+
+    if (
+        dx < 0 &&
+        dy > 0
+    ) {
+
+        return "South-west";
+    }
+
+
+    return "Nearby";
+}
+
+
+/* =========================================================
+   FIND INTERACTION TARGETS
+========================================================= */
+
+function getNearbyInteractionTargets() {
+
+    const targets =
+        [];
+
+
+    /*
+        Natural objects.
+
+        Her inkluderer vi også depleted objects.
+        Spilleren skal fortsatt kunne inspecte
+        en tom berry bush.
+    */
+
+    for (
+        const offset
+        of WORLD_OBJECT_INTERACTION_OFFSETS
+    ) {
+
+        const x =
+            player.x +
+            offset.x;
+
+        const y =
+            player.y +
+            offset.y;
+
+
+        const object =
+            getWorldObjectAt(
+                x,
+                y
+            );
+
+
+        if (!object) {
+
+            continue;
+        }
+
+
+        const definition =
+            getWorldObjectDefinition(
+                object.type
+            );
+
+
+        if (!definition) {
+
+            continue;
+        }
+
+
+        targets.push({
+
+            targetType:
+                "world_object",
+
+            targetId:
+                object.id,
+
+            name:
+                definition.name,
+
+            char:
+
+                object.depleted
+
+                    ? definition
+                        .depletedChar
+
+                    : definition
+                        .char,
+
+            x:
+                object.x,
+
+            y:
+                object.y,
+
+            detail:
+
+                `${getInteractionDirectionLabel(
+                    object.x,
+                    object.y
+                )}${
+                    object.depleted
+                        ? " — depleted"
+                        : ""
+                }`
+        });
+    }
+
+
+    /*
+        Settlement.
+
+        Vi bruker eksisterende
+        settlement interaction radius.
+    */
 
     const settlement =
         getNearbySettlement();
 
 
-    if (!settlement) {
+    if (settlement) {
+
+        targets.unshift({
+
+            targetType:
+                "settlement",
+
+            targetId:
+                settlement.id,
+
+            name:
+                settlement.name,
+
+            char:
+                settlement.char,
+
+            x:
+                settlement.x,
+
+            y:
+                settlement.y,
+
+            detail:
+
+                `Settlement — ${getInteractionDirectionLabel(
+                    settlement.x,
+                    settlement.y
+                )}`
+        });
+    }
+
+
+    return targets;
+}
+
+
+/* =========================================================
+   OPEN / CLOSE INTERACTION WINDOW
+========================================================= */
+
+function openInteractionWindow() {
+
+    /*
+        Ett hovedvindu om gangen.
+    */
+
+    closeInventoryWindow();
+
+    closeSettlementWindow();
+
+
+    const targets =
+        getNearbyInteractionTargets();
+
+
+    if (
+        targets.length === 0
+    ) {
 
         addLog(
             "There is nothing nearby to inspect."
@@ -2932,9 +6541,577 @@ function interactWithWorld() {
     }
 
 
-    openSettlementWindow(
-        settlement
+    interactionWindowOpen =
+        true;
+
+
+    interactionWindowState.view =
+        "list";
+
+    interactionWindowState.targetType =
+        null;
+
+    interactionWindowState.targetId =
+        null;
+
+
+    const windowElement =
+        document.getElementById(
+            "interaction-window"
+        );
+
+
+    windowElement.classList.remove(
+        "hidden"
     );
+
+
+    windowElement.setAttribute(
+        "aria-hidden",
+        "false"
+    );
+
+
+    renderInteractionWindow();
+}
+
+
+function closeInteractionWindow() {
+
+    interactionWindowOpen =
+        false;
+
+
+    interactionWindowState.view =
+        "list";
+
+    interactionWindowState.targetType =
+        null;
+
+    interactionWindowState.targetId =
+        null;
+
+
+    const windowElement =
+        document.getElementById(
+            "interaction-window"
+        );
+
+
+    if (!windowElement) {
+
+        return;
+    }
+
+
+    windowElement.classList.add(
+        "hidden"
+    );
+
+
+    windowElement.setAttribute(
+        "aria-hidden",
+        "true"
+    );
+}
+
+
+/* =========================================================
+   INTERACTION WINDOW RENDER
+========================================================= */
+
+function renderInteractionWindow() {
+
+    if (
+        !interactionWindowOpen
+    ) {
+
+        return;
+    }
+
+
+    if (
+        interactionWindowState.view ===
+        "inspect"
+    ) {
+
+        renderInteractionInspect();
+
+        return;
+    }
+
+
+    renderInteractionTargetList();
+}
+
+
+/* =========================================================
+   INTERACTION TARGET LIST
+========================================================= */
+
+function renderInteractionTargetList() {
+
+    const targets =
+        getNearbyInteractionTargets();
+
+
+    document.getElementById(
+        "interaction-window-title"
+    ).textContent =
+        "INTERACT";
+
+
+    const content =
+        document.getElementById(
+            "interaction-window-content"
+        );
+
+
+    if (
+        targets.length === 0
+    ) {
+
+        content.innerHTML = `
+
+            <div class="settlement-list-detail">
+                There is nothing nearby to inspect.
+            </div>
+        `;
+
+        return;
+    }
+
+
+    const targetHTML =
+
+        targets.map(
+            target => `
+
+                <button
+                    type="button"
+                    class="settlement-list-button"
+                    data-interaction-action="inspect"
+                    data-target-type="${escapeHTML(
+                        target.targetType
+                    )}"
+                    data-target-id="${escapeHTML(
+                        target.targetId
+                    )}"
+                >
+
+                    <span>
+                        ${escapeHTML(
+                            target.char
+                        )}
+                        &nbsp;
+                        ${escapeHTML(
+                            target.name
+                        )}
+                    </span>
+
+                    <span class="settlement-list-detail">
+                        ${escapeHTML(
+                            target.detail
+                        )}
+                    </span>
+
+                </button>
+            `
+        ).join("");
+
+
+    content.innerHTML = `
+
+        <div class="settlement-section-title">
+            NEARBY
+        </div>
+
+        ${targetHTML}
+    `;
+}
+
+
+/* =========================================================
+   SELECT INTERACTION TARGET
+========================================================= */
+
+function inspectInteractionTarget(
+    targetType,
+    targetId
+) {
+
+    interactionWindowState.view =
+        "inspect";
+
+    interactionWindowState.targetType =
+        targetType;
+
+    interactionWindowState.targetId =
+        targetId;
+
+
+    renderInteractionWindow();
+}
+
+
+/* =========================================================
+   INTERACTION INSPECT VIEW
+========================================================= */
+
+function renderInteractionInspect() {
+
+    const targetType =
+        interactionWindowState
+            .targetType;
+
+    const targetId =
+        interactionWindowState
+            .targetId;
+
+
+    const content =
+        document.getElementById(
+            "interaction-window-content"
+        );
+
+
+    /*
+        =========================================
+        NATURAL WORLD OBJECT
+        =========================================
+    */
+
+    if (
+        targetType ===
+        "world_object"
+    ) {
+
+        const object =
+            getWorldObjectById(
+                targetId
+            );
+
+
+        if (!object) {
+
+            interactionWindowState.view =
+                "list";
+
+            renderInteractionWindow();
+
+            return;
+        }
+
+
+        refreshWorldObjectState(
+            object
+        );
+
+
+        const definition =
+            getWorldObjectDefinition(
+                object.type
+            );
+
+
+        if (!definition) {
+
+            interactionWindowState.view =
+                "list";
+
+            renderInteractionWindow();
+
+            return;
+        }
+
+
+        document.getElementById(
+            "interaction-window-title"
+        ).textContent =
+
+            definition.name
+                .toUpperCase();
+
+
+        const description =
+
+            object.depleted
+
+                ? definition
+                    .depletedDescription
+
+                : definition
+                    .description;
+
+
+        let actionHTML =
+            "";
+
+
+        if (
+            !object.depleted &&
+            definition.gather
+        ) {
+
+            const gather =
+                definition.gather;
+
+
+            const item =
+                getItemDefinition(
+                    gather.itemId
+                );
+
+
+            actionHTML = `
+
+                <div class="settlement-section">
+
+                    <div class="settlement-section-title">
+                        ACTIONS
+                    </div>
+
+                    <button
+                        type="button"
+                        class="settlement-action-button"
+                        data-interaction-action="gather"
+                    >
+                        ${escapeHTML(
+                            gather.actionLabel ??
+                            "Gather"
+                        )}
+                    </button>
+
+                </div>
+            `;
+
+
+            if (item) {
+
+                actionHTML += `
+
+                    <div class="settlement-list-detail">
+                        Can provide: ${escapeHTML(
+                            item.name
+                        )}
+                    </div>
+                `;
+            }
+        }
+
+
+        content.innerHTML = `
+
+            <button
+                type="button"
+                class="settlement-back-button"
+                data-interaction-action="back"
+            >
+                &lt; Back
+            </button>
+
+
+            <div class="settlement-section">
+
+                <div class="settlement-row">
+                    <span>Symbol</span>
+
+                    <span>
+                        ${escapeHTML(
+                            object.depleted
+
+                                ? definition
+                                    .depletedChar
+
+                                : definition
+                                    .char
+                        )}
+                    </span>
+                </div>
+
+
+                <div class="settlement-row">
+                    <span>Location</span>
+
+                    <span>
+                        ${escapeHTML(
+                            getInteractionDirectionLabel(
+                                object.x,
+                                object.y
+                            )
+                        )}
+                    </span>
+                </div>
+
+
+                <div class="settlement-row">
+                    <span>Status</span>
+
+                    <span>
+                        ${
+                            object.depleted
+
+                                ? "Depleted"
+
+                                : "Available"
+                        }
+                    </span>
+                </div>
+
+            </div>
+
+
+            <div class="settlement-section">
+
+                <div class="settlement-section-title">
+                    INSPECT
+                </div>
+
+                <div>
+                    ${escapeHTML(
+                        description
+                    )}
+                </div>
+
+            </div>
+
+
+            ${actionHTML}
+        `;
+
+
+        return;
+    }
+
+
+    /*
+        =========================================
+        SETTLEMENT
+        =========================================
+    */
+
+    if (
+        targetType ===
+        "settlement"
+    ) {
+
+        const settlement =
+            getSettlementById(
+                targetId
+            );
+
+
+        if (!settlement) {
+
+            interactionWindowState.view =
+                "list";
+
+            renderInteractionWindow();
+
+            return;
+        }
+
+
+        document.getElementById(
+            "interaction-window-title"
+        ).textContent =
+
+            settlement.name
+                .toUpperCase();
+
+
+        content.innerHTML = `
+
+            <button
+                type="button"
+                class="settlement-back-button"
+                data-interaction-action="back"
+            >
+                &lt; Back
+            </button>
+
+
+            <div class="settlement-section">
+
+                <div class="settlement-section-title">
+                    INSPECT
+                </div>
+
+                <div>
+                    A settlement with
+                    ${settlement.population}
+                    inhabitants.
+                </div>
+
+            </div>
+
+
+            <div class="settlement-section">
+
+                <div class="settlement-section-title">
+                    ACTIONS
+                </div>
+
+                <button
+                    type="button"
+                    class="settlement-action-button"
+                    data-interaction-action="open-settlement"
+                >
+                    Inspect settlement
+                </button>
+
+            </div>
+        `;
+
+
+        return;
+    }
+
+
+    interactionWindowState.view =
+        "list";
+
+    renderInteractionWindow();
+}
+
+
+/* =========================================================
+   INTERACTION BACK
+========================================================= */
+
+function goBackInteractionWindow() {
+
+    if (
+        interactionWindowState.view ===
+        "inspect"
+    ) {
+
+        interactionWindowState.view =
+            "list";
+
+        interactionWindowState.targetType =
+            null;
+
+        interactionWindowState.targetId =
+            null;
+
+
+        renderInteractionWindow();
+
+        return;
+    }
+
+
+    closeInteractionWindow();
+}
+
+/* =========================================================
+   WORLD INTERACTION
+========================================================= */
+
+function interactWithWorld() {
+
+    openInteractionWindow();
 }
 
 /* =========================================================
@@ -3253,6 +7430,78 @@ function advanceWorldTime(
     }
 }
 
+function simulatePlayerSurvivalHour() {
+
+    const previousState =
+        getPlayerHungerState();
+
+
+    player.hunger =
+
+        Math.max(
+
+            0,
+
+            player.hunger -
+
+            PLAYER_SURVIVAL_RULES
+                .hungerLossPerHour
+        );
+
+
+    const newState =
+        getPlayerHungerState();
+
+
+    if (
+        previousState.id !==
+        newState.id
+    ) {
+
+        switch (
+            newState.id
+        ) {
+
+            case "hungry":
+
+                addLog(
+                    "You are getting hungry."
+                );
+
+                break;
+
+
+            case "very_hungry":
+
+                addLog(
+                    "You are very hungry."
+                );
+
+                break;
+
+
+            case "starving":
+
+                addLog(
+                    "You are starving."
+                );
+
+                break;
+        }
+    }
+
+
+    updateUI();
+
+
+    if (
+        inventoryWindowOpen
+    ) {
+
+        renderInventoryWindow();
+    }
+}
+
 /* =========================================================
    PLAYER ACTION TIME
 ========================================================= */
@@ -3319,6 +7568,13 @@ registerPlayerAction(
 
 registerPlayerAction(
     "wait",
+    {
+        minutes: 1
+    }
+);
+
+registerPlayerAction(
+    "trade_transaction",
     {
         minutes: 1
     }
@@ -3714,6 +7970,36 @@ registerNpcInteraction(
     }
 );
 
+registerNpcInteraction(
+
+    "trade",
+
+    {
+        label:
+            "Trade",
+
+        minutes:
+            1,
+
+
+        isAvailable:
+            person =>
+
+                canNpcTrade(
+                    person
+                ),
+
+
+        execute:
+            person => {
+
+                beginTradeWithPerson(
+                    person
+                );
+            }
+    }
+);
+
 /* =========================================================
    SEEDED RANDOM
 ========================================================= */
@@ -3923,6 +8209,221 @@ function fractalNoise(x, y, seed) {
 
 
     return value;
+}
+
+/* =========================================================
+   WORLD OBJECT GENERATION
+========================================================= */
+
+function canSpawnWorldObjectAt(
+    definition,
+    tile
+) {
+
+    if (
+        !definition ||
+        !tile
+    ) {
+
+        return false;
+    }
+
+
+    /*
+        Ikke spawn objects i vann,
+        på rivers eller direkte i settlements.
+    */
+
+    if (
+        tile.river ||
+        tile.settlementId !==
+            null
+    ) {
+
+        return false;
+    }
+
+
+    const spawn =
+        definition.spawn ??
+        {};
+
+
+    /*
+        Biome restriction.
+    */
+
+    if (
+        spawn.biomes.length > 0 &&
+        !spawn.biomes.includes(
+            tile.biome
+        )
+    ) {
+
+        return false;
+    }
+
+
+    /*
+        Terrain restriction.
+    */
+
+    if (
+        spawn.tileTypes.length > 0 &&
+        !spawn.tileTypes.includes(
+            tile.type
+        )
+    ) {
+
+        return false;
+    }
+
+
+    return true;
+}
+
+
+function generateWorldObjects(
+    seed
+) {
+
+    worldObjects =
+        [];
+
+
+    for (
+        let y = 0;
+        y < WORLD_HEIGHT;
+        y++
+    ) {
+
+        for (
+            let x = 0;
+            x < WORLD_WIDTH;
+            x++
+        ) {
+
+            const tile =
+                world[y][x];
+
+
+            /*
+                Foreløpig tillater vi maksimum
+                ett natural object per tile.
+            */
+
+            for (
+                const definition
+                of WORLD_OBJECT_DEFINITIONS.values()
+            ) {
+
+                if (
+                    !canSpawnWorldObjectAt(
+                        definition,
+                        tile
+                    )
+                ) {
+
+                    continue;
+                }
+
+
+                const spawn =
+                    definition.spawn;
+
+
+                const chance =
+
+                    Math.max(
+                        0,
+
+                        Math.min(
+                            1,
+
+                            Number(
+                                spawn.chance ??
+                                0
+                            )
+                        )
+                    );
+
+
+                if (
+                    chance <= 0
+                ) {
+
+                    continue;
+                }
+
+
+                const seedOffset =
+
+                    Number(
+                        spawn.seedOffset ??
+                        0
+                    ) || 0;
+
+
+                const roll =
+                    hashNoise(
+
+                        x,
+                        y,
+
+                        seed +
+                            seedOffset
+                    );
+
+
+                if (
+                    roll >=
+                    chance
+                ) {
+
+                    continue;
+                }
+
+
+                worldObjects.push({
+
+                    id:
+                        `world_object_${worldObjects.length + 1}`,
+
+                    type:
+                        definition.id,
+
+                    x,
+                    y,
+
+                    depleted:
+                        false,
+
+                    regrowAtMinutes:
+                        null
+                });
+
+
+                /*
+                    Ett object per tile.
+                */
+
+                break;
+            }
+        }
+    }
+
+
+    /*
+        Praktisk for debugging i console.
+    */
+
+    window.worldObjects =
+        worldObjects;
+
+
+    console.log(
+        `Generated ${worldObjects.length} natural world objects.`
+    );
 }
 
 /* =========================================================
@@ -4161,27 +8662,39 @@ function generateWorld(seed) {
         ============================================
     */
 
-generateResources(
-    seed
-);
+    generateResources(
+        seed
+    );
 
-generateSettlements(
-    seed
-);
-
-
-/*
-    ============================================
-    CIVILIZATION
-    ============================================
-*/
-
-generateCivilizations(
-    seed
-);
+    generateSettlements(
+        seed
+    );
 
 
-findPlayerSpawn();
+    /*
+        Natural objects genereres etter settlements.
+
+        Dermed kan vi unngå å plassere bushes,
+        branches osv. rett oppå settlements.
+    */
+
+    generateWorldObjects(
+        seed
+    );
+
+
+    /*
+        ============================================
+        CIVILIZATION
+        ============================================
+    */
+
+    generateCivilizations(
+        seed
+    );
+
+
+    findPlayerSpawn();
 }
 
 /* =========================================================
@@ -6971,6 +11484,56 @@ function createSettlement(
         population:
             0,
 
+
+        /*
+            Felles settlement storage.
+
+            Varer produsert av innbyggerne
+            havner her først.
+        */
+
+        inventory:
+            {},
+
+        coins:
+            0,
+
+
+        /*
+            Beholder desimal-produksjon mellom dager.
+
+            Eksempel:
+            2.6 bread i dag ->
+            2 bread + 0.6 carry til neste dag.
+        */
+
+        productionRemainders:
+            {},
+
+        /*
+            Oppdateres én gang per dag etter
+            settlementets food consumption.
+        */
+
+        foodSecurity: {
+
+            initialized:
+                false,
+
+            dailyNeed:
+                0,
+
+            consumed:
+                0,
+
+            coverage:
+                1,
+
+            shortageDays:
+                0
+        },
+
+
         biome:
             tile.biome,
 
@@ -7268,6 +11831,24 @@ function generateCivilizations(seed) {
 
     recalculatePopulationTotals();
 
+
+    /*
+        Merchant først.
+
+        Da blir den personen opptatt og
+        får ikke samtidig jobb som farmer,
+        miner osv.
+    */
+
+    assignStartingTraders(
+        random
+    );
+
+
+    assignStartingProfessions(
+        random
+    );
+
     window.factions =
         factions;
 
@@ -7304,8 +11885,6 @@ function generateCivilizations(seed) {
             })
         )
     );
-
-    recalculatePopulationTotals();
 
     validateCivilizationGeneration();
 
@@ -7700,6 +12279,752 @@ function getFactionName(
     return faction
         ? faction.name
         : "Independent";
+}
+
+/* =========================================================
+   STARTING MERCHANTS
+========================================================= */
+
+function assignStartingTraders(
+    random
+) {
+
+    for (
+        const settlement
+        of settlements
+    ) {
+
+        /*
+            Vi foretrekker household heads,
+            siden de allerede er notable residents.
+        */
+
+        let candidates =
+            getNotableResidents(
+                settlement,
+                8
+            ).filter(
+                person =>
+
+                    person.alive &&
+
+                    getPersonAge(
+                        person
+                    ) >=
+                    POPULATION_RULES
+                        .adulthoodAge
+            );
+
+
+        /*
+            Fallback.
+        */
+
+        if (
+            candidates.length === 0
+        ) {
+
+            candidates =
+                getLivingSettlementResidents(
+                    settlement
+                ).filter(
+                    person =>
+
+                        getPersonAge(
+                            person
+                        ) >=
+                        POPULATION_RULES
+                            .adulthoodAge
+                );
+        }
+
+
+        if (
+            candidates.length === 0
+        ) {
+
+            continue;
+        }
+
+
+        const merchant =
+
+            candidates[
+                Math.floor(
+                    random() *
+                    candidates.length
+                )
+            ];
+
+
+        setupStartingMerchant(
+
+            merchant,
+
+            settlement,
+
+            random
+        );
+    }
+}
+
+
+function setupStartingMerchant(
+    person,
+    settlement,
+    random
+) {
+
+    person.profession =
+        "merchant";
+
+
+    person.tradeProfile = {
+
+        /*
+            NPC sells for slightly more
+            than base value.
+        */
+
+        sellMultiplier:
+
+            1.10 +
+
+            random() *
+            0.15,
+
+
+        /*
+            NPC buys from player
+            below base value.
+        */
+
+        buyMultiplier:
+
+            0.45 +
+
+            random() *
+            0.15
+    };
+
+
+    person.coins =
+
+        80 +
+
+        randomInteger(
+            random,
+            0,
+            80
+        );
+
+
+    person.inventory =
+        {};
+
+
+    const resources =
+        settlement.resources ||
+        {};
+
+
+    /*
+        Stock reflects the settlement.
+    */
+
+    addItemToInventory(
+
+        person,
+
+        "bread",
+
+        4 +
+
+        Math.floor(
+            (resources.fertility ?? 0) *
+            12
+        )
+    );
+
+
+    addItemToInventory(
+
+        person,
+
+        "berries",
+
+        2 +
+
+        Math.floor(
+            (resources.fertility ?? 0) *
+            6
+        )
+    );
+
+
+    addItemToInventory(
+
+        person,
+
+        "dried_meat",
+
+        randomInteger(
+            random,
+            2,
+            6
+        )
+    );
+
+
+    addItemToInventory(
+
+        person,
+
+        "timber_bundle",
+
+        Math.floor(
+            (resources.timber ?? 0) *
+            12
+        )
+    );
+
+
+    addItemToInventory(
+
+        person,
+
+        "stone",
+
+        Math.floor(
+            (resources.stone ?? 0) *
+            10
+        )
+    );
+
+
+    addItemToInventory(
+
+        person,
+
+        "iron_ore",
+
+        Math.floor(
+            (resources.iron ?? 0) *
+            8
+        )
+    );
+}
+
+/* =========================================================
+   NPC TRADE
+========================================================= */
+
+function canNpcTrade(
+    person
+) {
+
+    return (
+
+        canPlayerInteractWithPerson(
+            person
+        ) &&
+
+        person.tradeProfile !==
+            null
+    );
+}
+
+
+function getNpcSalePrice(
+    person,
+    itemId
+) {
+
+    const item =
+        getItemDefinition(
+            itemId
+        );
+
+
+    if (
+        !item ||
+        !person.tradeProfile
+    ) {
+
+        return 0;
+    }
+
+
+    return Math.max(
+
+        1,
+
+        Math.ceil(
+
+            item.baseValue *
+
+            person
+                .tradeProfile
+                .sellMultiplier
+        )
+    );
+}
+
+
+function getNpcPurchasePrice(
+    person,
+    itemId
+) {
+
+    const item =
+        getItemDefinition(
+            itemId
+        );
+
+
+    if (
+        !item ||
+        !person.tradeProfile
+    ) {
+
+        return 0;
+    }
+
+
+    return Math.max(
+
+        1,
+
+        Math.floor(
+
+            item.baseValue *
+
+            person
+                .tradeProfile
+                .buyMultiplier
+        )
+    );
+}
+
+
+function beginTradeWithPerson(
+    person
+) {
+
+    navigateSettlementWindow(
+
+        "trade",
+
+        {
+            personId:
+                person.id
+        }
+    );
+}
+
+/* =========================================================
+   TRADE VIEW
+========================================================= */
+
+function renderNpcTrade() {
+
+    const person =
+        getPersonById(
+            settlementWindowState.personId
+        );
+
+
+    if (
+        !person ||
+        !person.alive ||
+        !person.tradeProfile
+    ) {
+
+        goBackSettlementWindow();
+
+        return;
+    }
+
+
+    const buyEntries =
+        getInventoryEntries(
+            person,
+            {
+                tradableOnly:
+                    true
+            }
+        );
+
+
+    const sellEntries =
+        getInventoryEntries(
+            player,
+            {
+                tradableOnly:
+                    true
+            }
+        );
+
+
+    document.getElementById(
+        "settlement-window-title"
+    ).textContent =
+
+        `${person.name.toUpperCase()} — TRADE`;
+
+
+    const buyHTML =
+
+        buyEntries.length > 0
+
+            ? buyEntries.map(
+                entry => {
+
+                    const price =
+                        getNpcSalePrice(
+                            person,
+                            entry.item.id
+                        );
+
+
+                    return `
+
+                        <div class="trade-row">
+
+                            <div class="trade-item-info">
+
+                                <div>
+                                    ${escapeHTML(entry.item.name)}
+                                </div>
+
+                                <div class="settlement-list-detail">
+                                    Stock: ${entry.amount}
+                                </div>
+
+                            </div>
+
+                            <button
+                                type="button"
+                                class="trade-button"
+                                data-settlement-action="trade-buy"
+                                data-person-id="${escapeHTML(person.id)}"
+                                data-item-id="${escapeHTML(entry.item.id)}"
+                                ${
+                                    player.coins < price
+                                        ? "disabled"
+                                        : ""
+                                }
+                            >
+                                Buy — ${price}
+                            </button>
+
+                        </div>
+                    `;
+                }
+            ).join("")
+
+            : `
+                <div class="settlement-list-detail">
+                    Nothing for sale.
+                </div>
+            `;
+
+
+    const sellHTML =
+
+        sellEntries.length > 0
+
+            ? sellEntries.map(
+                entry => {
+
+                    const price =
+                        getNpcPurchasePrice(
+                            person,
+                            entry.item.id
+                        );
+
+
+                    return `
+
+                        <div class="trade-row">
+
+                            <div class="trade-item-info">
+
+                                <div>
+                                    ${escapeHTML(entry.item.name)}
+                                </div>
+
+                                <div class="settlement-list-detail">
+                                    You have: ${entry.amount}
+                                </div>
+
+                            </div>
+
+                            <button
+                                type="button"
+                                class="trade-button"
+                                data-settlement-action="trade-sell"
+                                data-person-id="${escapeHTML(person.id)}"
+                                data-item-id="${escapeHTML(entry.item.id)}"
+                                ${
+                                    person.coins < price
+                                        ? "disabled"
+                                        : ""
+                                }
+                            >
+                                Sell — ${price}
+                            </button>
+
+                        </div>
+                    `;
+                }
+            ).join("")
+
+            : `
+                <div class="settlement-list-detail">
+                    You have nothing to sell.
+                </div>
+            `;
+
+
+    document.getElementById(
+        "settlement-window-content"
+    ).innerHTML = `
+
+        <button
+            type="button"
+            class="settlement-back-button"
+            data-settlement-action="back"
+        >
+            &lt; Back
+        </button>
+
+
+        <div class="trade-summary">
+
+            <span>
+                Your coins:
+                ${player.coins}
+            </span>
+
+            <span>
+                Merchant:
+                ${person.coins}
+            </span>
+
+        </div>
+
+
+        <div class="settlement-section">
+
+            <div class="settlement-section-title">
+                BUY
+            </div>
+
+            ${buyHTML}
+
+        </div>
+
+
+        <div class="settlement-section">
+
+            <div class="settlement-section-title">
+                SELL
+            </div>
+
+            ${sellHTML}
+
+        </div>
+    `;
+}
+
+function buyOneItemFromNpc(
+    personId,
+    itemId
+) {
+
+    const person =
+        getPersonById(
+            personId
+        );
+
+
+    const item =
+        getItemDefinition(
+            itemId
+        );
+
+
+    if (
+        !person ||
+        !item ||
+        !canNpcTrade(person)
+    ) {
+
+        return;
+    }
+
+
+    const price =
+        getNpcSalePrice(
+            person,
+            itemId
+        );
+
+
+    if (
+        getItemAmount(
+            person,
+            itemId
+        ) < 1
+    ) {
+
+        addLog(
+            `${person.name} has no ${item.name} left.`
+        );
+
+        renderSettlementWindow();
+
+        return;
+    }
+
+
+    if (
+        player.coins <
+        price
+    ) {
+
+        addLog(
+            "You cannot afford that."
+        );
+
+        return;
+    }
+
+
+    if (
+        !transferItem(
+            person,
+            player,
+            itemId,
+            1
+        )
+    ) {
+
+        return;
+    }
+
+
+    player.coins -=
+        price;
+
+    person.coins +=
+        price;
+
+
+    finishTurn(
+        "trade_transaction"
+    );
+
+
+    addLog(
+        `You buy ${item.name} for ${price} coins.`
+    );
+
+
+    renderSettlementWindow();
+}
+
+
+function sellOneItemToNpc(
+    personId,
+    itemId
+) {
+
+    const person =
+        getPersonById(
+            personId
+        );
+
+
+    const item =
+        getItemDefinition(
+            itemId
+        );
+
+
+    if (
+        !person ||
+        !item ||
+        !canNpcTrade(person)
+    ) {
+
+        return;
+    }
+
+
+    const price =
+        getNpcPurchasePrice(
+            person,
+            itemId
+        );
+
+
+    if (
+        getItemAmount(
+            player,
+            itemId
+        ) < 1
+    ) {
+
+        return;
+    }
+
+
+    if (
+        person.coins <
+        price
+    ) {
+
+        addLog(
+            `${person.name} cannot afford that.`
+        );
+
+        return;
+    }
+
+
+    if (
+        !transferItem(
+            player,
+            person,
+            itemId,
+            1
+        )
+    ) {
+
+        return;
+    }
+
+
+    person.coins -=
+        price;
+
+    player.coins +=
+        price;
+
+
+    finishTurn(
+        "trade_transaction"
+    );
+
+
+    addLog(
+        `You sell ${item.name} for ${price} coins.`
+    );
+
+
+    renderSettlementWindow();
 }
 
 /* =========================================================
@@ -8256,6 +13581,14 @@ function createPerson({
         skills:
             {},
 
+        coins:
+            0,
+
+        inventory:
+            {},
+
+        tradeProfile:
+            null,
 
         health:
             100,
@@ -8664,6 +13997,18 @@ registerSimulationHook(
     simulatePregnanciesDay
 );
 
+registerSimulationHook(
+    "day",
+    simulateSettlementProductionDay
+);
+
+registerSimulationHook(
+
+    "hour",
+
+    simulatePlayerSurvivalHour
+);
+
 /* =========================================================
    POPULATION INFLUENCES
 ========================================================= */
@@ -8812,6 +14157,114 @@ function getPopulationInfluence(
 }
 
 /* =========================================================
+   FOOD SECURITY -> POPULATION INFLUENCE
+========================================================= */
+
+registerPopulationInfluenceProvider(
+    person => {
+
+        if (
+            !person ||
+            !person.alive
+        ) {
+
+            return null;
+        }
+
+
+        const settlement =
+            getSettlementById(
+                person.settlementId
+            );
+
+
+        if (
+            !settlement ||
+            !settlement.foodSecurity ||
+            !settlement.foodSecurity.initialized
+        ) {
+
+            return null;
+        }
+
+
+        const foodSecurity =
+            settlement.foodSecurity;
+
+
+        const coverage =
+
+            Math.max(
+                0,
+                Math.min(
+                    1,
+                    foodSecurity.coverage
+                )
+            );
+
+
+        if (
+            coverage >=
+            SETTLEMENT_FOOD_RULES
+                .shortageCoverageThreshold
+        ) {
+
+            return null;
+        }
+
+
+        /*
+            Fertility reagerer ganske raskt på
+            dårlig food security.
+        */
+
+        const fertilityMultiplier =
+
+            0.15 +
+            coverage *
+            0.85;
+
+
+        /*
+            Mortality reagerer mer gradvis.
+
+            En dårlig dag skal ikke være katastrofal,
+            men en shortage som varer i flere uker
+            blir etter hvert farlig.
+        */
+
+        const chronicFactor =
+
+            Math.min(
+                1,
+                foodSecurity.shortageDays /
+                14
+            );
+
+
+        const mortalityMultiplier =
+
+            1 +
+
+            (
+                1 -
+                coverage
+            ) *
+
+            2.5 *
+            chronicFactor;
+
+
+        return {
+
+            fertilityMultiplier,
+
+            mortalityMultiplier
+        };
+    }
+);
+
+/* =========================================================
    SIMULATION RANDOM
 ========================================================= */
 
@@ -8826,6 +14279,15 @@ function resetSimulationRandom() {
             WORLD_SEED +
             120000
         ) >>> 0;
+}
+
+function resetPlayerSurvival() {
+
+    player.hp =
+        player.maxHp;
+
+    player.hunger =
+        100;
 }
 
 
@@ -9177,6 +14639,8 @@ registerSimulationHook(
     "month",
     simulatePopulationMonth
 );
+
+
 
 /* =========================================================
    NATURAL MORTALITY
@@ -10014,6 +15478,45 @@ function clearSpawnArea() {
             }
         }
     }
+
+    /*
+        Fjern også små natural objects rett
+        rundt player spawn.
+
+        Spilleren skal ikke starte oppå
+        en branch eller berry bush.
+    */
+
+    worldObjects =
+
+        worldObjects.filter(
+            object => {
+
+                const dx =
+                    Math.abs(
+                        object.x -
+                        player.x
+                    );
+
+                const dy =
+                    Math.abs(
+                        object.y -
+                        player.y
+                    );
+
+
+                return (
+
+                    dx > 2 ||
+                    dy > 2
+                );
+            }
+        );
+
+
+    window.worldObjects =
+        worldObjects;
+
 }
 
 
@@ -10602,6 +16105,532 @@ function updateCreatures() {
     }
 }
 
+/* =========================================================
+   DRAW NATURAL WORLD OBJECTS
+========================================================= */
+
+function drawWorldObjects(
+    camera
+) {
+
+    for (
+        const object
+        of worldObjects
+    ) {
+
+        refreshWorldObjectState(
+            object
+        );
+
+
+        const definition =
+            getWorldObjectDefinition(
+                object.type
+            );
+
+
+        if (!definition) {
+
+            continue;
+        }
+
+
+        const screenX =
+            object.x -
+            camera.x;
+
+        const screenY =
+            object.y -
+            camera.y;
+
+
+        if (
+            screenX < 0 ||
+            screenY < 0 ||
+            screenX >=
+                camera.columns ||
+            screenY >=
+                camera.rows
+        ) {
+
+            continue;
+        }
+
+
+        const char =
+
+            object.depleted
+
+                ? definition
+                    .depletedChar
+
+                : definition
+                    .char;
+
+
+        const color =
+
+            object.depleted
+
+                ? definition
+                    .depletedColor
+
+                : definition
+                    .color;
+
+
+        ctx.fillStyle =
+            color;
+
+
+        ctx.fillText(
+
+            char,
+
+            screenX *
+                CELL_WIDTH +
+                CELL_WIDTH / 2,
+
+            screenY *
+                CELL_HEIGHT +
+                CELL_HEIGHT / 2
+        );
+    }
+}
+
+/* =========================================================
+   MINIMAP
+========================================================= */
+
+function getMinimapTerrainColor(
+    tile
+) {
+
+    if (!tile) {
+
+        return "#050705";
+    }
+
+
+    if (
+        tile.river
+    ) {
+
+        const riverStyle =
+
+            RIVER_STYLES[
+                tile.riverSize
+            ] ||
+            RIVER_STYLES[1];
+
+
+        return riverStyle.color;
+    }
+
+
+    const definition =
+        TILES[
+            tile.type
+        ];
+
+
+    return (
+
+        definition
+
+            ? definition.color
+
+            : "#050705"
+    );
+}
+
+
+function renderMinimap() {
+
+    if (
+        !minimapCanvas ||
+        !minimapCtx ||
+        world.length === 0
+    ) {
+
+        return;
+    }
+
+
+    const width =
+        minimapCanvas.width;
+
+    const height =
+        minimapCanvas.height;
+
+
+    minimapCtx.fillStyle =
+        "#050705";
+
+    minimapCtx.fillRect(
+        0,
+        0,
+        width,
+        height
+    );
+
+
+    const diameter =
+        MINIMAP_RADIUS * 2 +
+        1;
+
+
+    const cellSize =
+
+        Math.max(
+            1,
+            Math.floor(
+                Math.min(
+                    width,
+                    height
+                ) /
+                diameter
+            )
+        );
+
+
+    const mapPixelWidth =
+        diameter *
+        cellSize;
+
+    const mapPixelHeight =
+        diameter *
+        cellSize;
+
+
+    const originX =
+        Math.floor(
+            (
+                width -
+                mapPixelWidth
+            ) / 2
+        );
+
+    const originY =
+        Math.floor(
+            (
+                height -
+                mapPixelHeight
+            ) / 2
+        );
+
+
+    const startX =
+        player.x -
+        MINIMAP_RADIUS;
+
+    const startY =
+        player.y -
+        MINIMAP_RADIUS;
+
+
+    /* =========================================
+       TERRAIN
+    ========================================= */
+
+    for (
+        let localY = 0;
+        localY < diameter;
+        localY++
+    ) {
+
+        for (
+            let localX = 0;
+            localX < diameter;
+            localX++
+        ) {
+
+            const worldX =
+                startX +
+                localX;
+
+            const worldY =
+                startY +
+                localY;
+
+
+            if (
+                !isInsideWorld(
+                    worldX,
+                    worldY
+                )
+            ) {
+
+                continue;
+            }
+
+
+            const tile =
+                getTile(
+                    worldX,
+                    worldY
+                );
+
+
+            minimapCtx.fillStyle =
+                getMinimapTerrainColor(
+                    tile
+                );
+
+
+            minimapCtx.fillRect(
+
+                originX +
+                    localX *
+                    cellSize,
+
+                originY +
+                    localY *
+                    cellSize,
+
+                cellSize,
+                cellSize
+            );
+        }
+    }
+
+
+    /* =========================================
+       MAIN CAMERA AREA
+    ========================================= */
+
+    const camera =
+        getCamera();
+
+
+    const minimapEndX =
+        startX +
+        diameter;
+
+    const minimapEndY =
+        startY +
+        diameter;
+
+
+    const visibleStartX =
+        Math.max(
+            startX,
+            camera.x
+        );
+
+    const visibleStartY =
+        Math.max(
+            startY,
+            camera.y
+        );
+
+    const visibleEndX =
+        Math.min(
+            minimapEndX,
+            camera.x +
+                camera.columns
+        );
+
+    const visibleEndY =
+        Math.min(
+            minimapEndY,
+            camera.y +
+                camera.rows
+        );
+
+
+    if (
+        visibleEndX >
+            visibleStartX &&
+        visibleEndY >
+            visibleStartY
+    ) {
+
+        const cameraPixelX =
+
+            originX +
+            (
+                visibleStartX -
+                startX
+            ) *
+            cellSize;
+
+        const cameraPixelY =
+
+            originY +
+            (
+                visibleStartY -
+                startY
+            ) *
+            cellSize;
+
+        const cameraPixelWidth =
+
+            (
+                visibleEndX -
+                visibleStartX
+            ) *
+            cellSize;
+
+        const cameraPixelHeight =
+
+            (
+                visibleEndY -
+                visibleStartY
+            ) *
+            cellSize;
+
+
+        minimapCtx.strokeStyle =
+            "#b8b8aa";
+
+        minimapCtx.lineWidth =
+            1;
+
+        minimapCtx.strokeRect(
+
+            cameraPixelX +
+                0.5,
+
+            cameraPixelY +
+                0.5,
+
+            Math.max(
+                1,
+                cameraPixelWidth -
+                    1
+            ),
+
+            Math.max(
+                1,
+                cameraPixelHeight -
+                    1
+            )
+        );
+    }
+
+
+    /* =========================================
+       KNOWN SETTLEMENTS
+    ========================================= */
+
+    for (
+        const settlement
+        of settlements
+    ) {
+
+        if (
+            !knowsEntity(
+                "settlement",
+                settlement.id
+            )
+        ) {
+
+            continue;
+        }
+
+
+        const localX =
+            settlement.x -
+            startX;
+
+        const localY =
+            settlement.y -
+            startY;
+
+
+        if (
+            localX < 0 ||
+            localY < 0 ||
+            localX >= diameter ||
+            localY >= diameter
+        ) {
+
+            continue;
+        }
+
+
+        const markerSize =
+            Math.max(
+                3,
+                cellSize +
+                    2
+            );
+
+
+        const centerX =
+
+            originX +
+            localX *
+                cellSize +
+            cellSize / 2;
+
+        const centerY =
+
+            originY +
+            localY *
+                cellSize +
+            cellSize / 2;
+
+
+        minimapCtx.fillStyle =
+            settlement.color;
+
+        minimapCtx.fillRect(
+
+            Math.floor(
+                centerX -
+                markerSize / 2
+            ),
+
+            Math.floor(
+                centerY -
+                markerSize / 2
+            ),
+
+            markerSize,
+            markerSize
+        );
+    }
+
+
+    /* =========================================
+       PLAYER
+    ========================================= */
+
+    const playerCenterX =
+
+        originX +
+        MINIMAP_RADIUS *
+            cellSize +
+        cellSize / 2;
+
+    const playerCenterY =
+
+        originY +
+        MINIMAP_RADIUS *
+            cellSize +
+        cellSize / 2;
+
+
+    minimapCtx.fillStyle =
+        "#ffffff";
+
+
+    minimapCtx.fillRect(
+
+        Math.floor(
+            playerCenterX - 2
+        ),
+
+        Math.floor(
+            playerCenterY - 2
+        ),
+
+        5,
+        5
+    );
+}
 
 /* =========================================================
    CAMERA
@@ -10610,46 +16639,92 @@ function updateCreatures() {
 function getCamera() {
 
     const columns =
-        Math.floor(
-            canvas.width / CELL_WIDTH
+
+        Math.min(
+
+            WORLD_WIDTH,
+
+            Math.max(
+                1,
+
+                Math.ceil(
+                    canvas.width /
+                    CELL_WIDTH
+                )
+            )
         );
 
+
     const rows =
-        Math.floor(
-            canvas.height / CELL_HEIGHT
+
+        Math.min(
+
+            WORLD_HEIGHT,
+
+            Math.max(
+                1,
+
+                Math.ceil(
+                    canvas.height /
+                    CELL_HEIGHT
+                )
+            )
         );
 
 
     let x =
+
         player.x -
-        Math.floor(columns / 2);
+        Math.floor(
+            columns / 2
+        );
+
 
     let y =
+
         player.y -
-        Math.floor(rows / 2);
+        Math.floor(
+            rows / 2
+        );
 
 
-    x = Math.max(
-        0,
-        Math.min(
-            WORLD_WIDTH - columns,
-            x
-        )
-    );
+    x =
+
+        Math.max(
+
+            0,
+
+            Math.min(
+
+                WORLD_WIDTH -
+                    columns,
+
+                x
+            )
+        );
 
 
-    y = Math.max(
-        0,
-        Math.min(
-            WORLD_HEIGHT - rows,
-            y
-        )
-    );
+    y =
+
+        Math.max(
+
+            0,
+
+            Math.min(
+
+                WORLD_HEIGHT -
+                    rows,
+
+                y
+            )
+        );
 
 
     return {
+
         x,
         y,
+
         columns,
         rows
     };
@@ -10693,8 +16768,16 @@ function render() {
     );
 
 
+    const fontSize =
+
+        Math.max(
+            6,
+            CELL_HEIGHT - 2
+        );
+
+
     ctx.font =
-        `${CELL_HEIGHT - 2}px "Courier New", monospace`;
+        `${fontSize}px "Courier New", monospace`;
 
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
@@ -10768,6 +16851,14 @@ function render() {
             );
         }
     }
+
+    /*
+        NATURAL WORLD OBJECTS
+    */
+
+    drawWorldObjects(
+        camera
+    );
 
     /*
         SETTLEMENTS
@@ -10845,6 +16936,8 @@ function render() {
         playerScreenY * CELL_HEIGHT +
             CELL_HEIGHT / 2
     );
+
+    renderMinimap();
 }
 
 /* =========================================================
@@ -10891,6 +16984,87 @@ window.addEventListener(
         const key =
             event.key.toLowerCase();
 
+        /*
+            CAMERA ZOOM
+
+            Zoom er UI/camera og bruker derfor
+            ingen game turn.
+        */
+
+        if (
+            key === "+" ||
+            key === "="
+        ) {
+
+            event.preventDefault();
+
+            changeCameraZoom(
+                1
+            );
+
+            return;
+        }
+
+
+        if (
+            key === "-"
+        ) {
+
+            event.preventDefault();
+
+            changeCameraZoom(
+                -1
+            );
+
+            return;
+        }
+
+
+        if (
+            key === "0"
+        ) {
+
+            event.preventDefault();
+
+            resetCameraZoom();
+
+            return;
+        }
+
+        /*
+            Interaction window fungerer som modal.
+        */
+
+        if (
+            isInteractionWindowOpen()
+        ) {
+
+            if (
+                key === "escape"
+            ) {
+
+                event.preventDefault();
+
+                goBackInteractionWindow();
+
+                return;
+            }
+
+
+            if (
+                key === "e"
+            ) {
+
+                event.preventDefault();
+
+                closeInteractionWindow();
+
+                return;
+            }
+
+
+            return;
+        }
 
         /*
             Settlement window fungerer
@@ -10940,6 +17114,35 @@ window.addEventListener(
             event.preventDefault();
 
             interactWithWorld();
+
+            return;
+        }
+
+        if (
+            key === "i"
+        ) {
+
+            event.preventDefault();
+
+            openInventoryWindow();
+
+            return;
+        }
+
+        if (
+            isInventoryWindowOpen()
+        ) {
+
+            if (
+                key === "escape" ||
+                key === "i"
+            ) {
+
+                event.preventDefault();
+
+                closeInventoryWindow();
+            }
+
 
             return;
         }
@@ -11063,11 +17266,20 @@ function updateUI() {
         `${player.hp}/${player.maxHp}`;
 
 
+    const hungerState =
+        getPlayerHungerState();
+
+
     document.getElementById(
         "hunger-value"
     ).textContent =
-        player.hunger;
 
+        `${Math.round(player.hunger)} (${hungerState.label})`;
+
+    document.getElementById(
+        "coins-value"
+    ).textContent =
+        player.coins;
 
     document.getElementById(
         "position-value"
@@ -11081,10 +17293,19 @@ function updateUI() {
         turn;
 
 
+    const zoomPercent =
+
+        Math.round(
+            getCameraZoom() *
+            100
+        );
+
+
     document.getElementById(
         "seed-display"
     ).textContent =
-        `SEED ${WORLD_SEED}`;
+
+        `SEED ${WORLD_SEED} | ZOOM ${zoomPercent}%`;
 
 
     /* =========================================
@@ -11146,17 +17367,24 @@ function updateUI() {
    START GAME
 ========================================================= */
 
+
 function startGame() {
 
     resetPlayerKnowledge();
 
     closeSettlementWindow();
 
+    closeInteractionWindow();
+
     resetWorldTime();
 
     resetWorldHistory();
 
     resetSimulationRandom();
+
+    resetPlayerEconomy();
+
+    resetPlayerSurvival();
 
     generateWorld(
         WORLD_SEED
@@ -11204,6 +17432,86 @@ function startGame() {
 window.addEventListener(
     "resize",
     resizeCanvas
+);
+
+/* =========================================================
+   MOUSE WHEEL ZOOM
+========================================================= */
+
+canvas.addEventListener(
+
+    "wheel",
+
+    event => {
+
+        event.preventDefault();
+
+
+        if (
+            event.deltaY < 0
+        ) {
+
+            changeCameraZoom(
+                1
+            );
+
+        } else {
+
+            changeCameraZoom(
+                -1
+            );
+        }
+    },
+
+    {
+        passive:
+            false
+    }
+);
+
+document.getElementById(
+    "inventory-button"
+).addEventListener(
+    "click",
+    openInventoryWindow
+);
+
+
+document.getElementById(
+    "close-inventory-window"
+).addEventListener(
+    "click",
+    closeInventoryWindow
+);
+
+
+document.getElementById(
+    "inventory-window-content"
+).addEventListener(
+    "click",
+    event => {
+
+        const button =
+            event.target.closest(
+                "[data-item-action]"
+            );
+
+
+        if (!button) {
+
+            return;
+        }
+
+
+        performItemAction(
+
+            button.dataset
+                .itemAction,
+
+            button.dataset
+                .itemId
+        );
+    }
 );
 
 document.getElementById(
@@ -11298,6 +17606,33 @@ document.getElementById(
 
                 break;
 
+            case "trade-buy":
+
+                buyOneItemFromNpc(
+
+                    button.dataset
+                        .personId,
+
+                    button.dataset
+                        .itemId
+                );
+
+                break;
+
+
+            case "trade-sell":
+
+                sellOneItemToNpc(
+
+                    button.dataset
+                        .personId,
+
+                    button.dataset
+                        .itemId
+                );
+
+                break;
+
 
             case "dialogue-topic":
 
@@ -11309,6 +17644,201 @@ document.getElementById(
                 break;
 
 
+        }
+    }
+);
+
+document.getElementById(
+    "close-interaction-window"
+).addEventListener(
+    "click",
+    closeInteractionWindow
+);
+
+
+document.getElementById(
+    "interaction-window-content"
+).addEventListener(
+
+    "click",
+
+    event => {
+
+        const button =
+            event.target.closest(
+                "[data-interaction-action]"
+            );
+
+
+        if (!button) {
+
+            return;
+        }
+
+
+        const action =
+            button.dataset
+                .interactionAction;
+
+
+        /*
+            =====================================
+            INSPECT TARGET
+            =====================================
+        */
+
+        if (
+            action ===
+            "inspect"
+        ) {
+
+            inspectInteractionTarget(
+
+                button.dataset
+                    .targetType,
+
+                button.dataset
+                    .targetId
+            );
+
+            return;
+        }
+
+
+        /*
+            =====================================
+            BACK
+            =====================================
+        */
+
+        if (
+            action ===
+            "back"
+        ) {
+
+            goBackInteractionWindow();
+
+            return;
+        }
+
+
+        /*
+            =====================================
+            GATHER
+            =====================================
+        */
+
+        if (
+            action ===
+            "gather"
+        ) {
+
+            if (
+                interactionWindowState
+                    .targetType !==
+                "world_object"
+            ) {
+
+                return;
+            }
+
+
+            const object =
+                getWorldObjectById(
+
+                    interactionWindowState
+                        .targetId
+                );
+
+
+            if (!object) {
+
+                goBackInteractionWindow();
+
+                return;
+            }
+
+
+            const success =
+                gatherWorldObject(
+                    object
+                );
+
+
+            if (!success) {
+
+                renderInteractionWindow();
+
+                return;
+            }
+
+
+            /*
+                Etter gathering går vi tilbake
+                til nearby-listen.
+
+                Dermed kan spilleren velge neste
+                object uten å lukke vinduet.
+            */
+
+            interactionWindowState.view =
+                "list";
+
+            interactionWindowState.targetType =
+                null;
+
+            interactionWindowState.targetId =
+                null;
+
+
+            if (
+                getNearbyInteractionTargets()
+                    .length === 0
+            ) {
+
+                closeInteractionWindow();
+
+            } else {
+
+                renderInteractionWindow();
+            }
+
+
+            return;
+        }
+
+
+        /*
+            =====================================
+            OPEN SETTLEMENT
+            =====================================
+        */
+
+        if (
+            action ===
+            "open-settlement"
+        ) {
+
+            const settlement =
+                getSettlementById(
+
+                    interactionWindowState
+                        .targetId
+                );
+
+
+            if (!settlement) {
+
+                return;
+            }
+
+
+            closeInteractionWindow();
+
+
+            openSettlementWindow(
+                settlement
+            );
         }
     }
 );

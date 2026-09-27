@@ -1,180 +1,198 @@
+"use strict";
+
+
 /* =========================================================
-   VOIDQUEST LAUNCHER
+   VOIDQUEST WEBSITE DATA
+
+   This is the main part you edit when
+   adding games or development posts.
    ========================================================= */
 
 
 /* =========================================================
-   EDIT YOUR CONTENT HERE
+   GAMES
    ========================================================= */
-
-
-/*
-    Add your games here.
-
-    path:
-    Where the PLAY button sends the player.
-
-    image:
-    Leave "" for now.
-    Later you can use something like:
-
-    image: "assets/dungeons-cover.png"
-
-*/
-
 
 const games = [
 
-    
 
     {
-        id: "vq-rpg",
 
-        title: "VQ RPG",
+        id:
+            "vq-rpg",
 
-        shortTitle: "VQRPG",
+        title:
+            "VQ RPG",
 
-        status: "IN DEVELOPMENT",
+        status:
+            "IN DEVELOPMENT",
 
-        type: "OPEN WORLD RPG",
+        type:
+            "Open World RPG",
 
         description:
-            "A retro open world adventure with exploration, dungeons, combat and old-school RPG mechanics.",
+            "An ASCII open world RPG focused on exploration, simulation, worldbuilding, settlements, factions, characters and player freedom.",
 
-        path: "./vq-rpg-ascii/",
+        path:
+            "./vq-rpg-ascii/",
 
-        image: "",
-
-        featured: true,
+        featured:
+            true,
 
         tags: [
-            "2D",
-            "PIXEL ART",
+
+            "ASCII",
+
             "RPG",
-            "DUNGEON CRAWLER",
-            "ADVENTURE"
+
+            "OPEN WORLD",
+
+            "SIMULATION",
+
+            "PROCEDURAL WORLD"
+
         ]
+
     },
-    
+
+
 
     {
-        id: "vq-settlement",
 
-        title: "VQ Settlement",
+        id:
+            "vq-settlement",
 
-        shortTitle: "Colony",
+        title:
+            "VQ Settlement",
 
-        status: "IN DEVELOPMENT",
+        status:
+            "IN DEVELOPMENT / ON HOLD",
 
-        type: "SETTLEMENT RPG",
+        type:
+            "Settlement Simulation",
 
         description:
-            "A new VoidQuest project focused on simulation, survival and developing a settlement/colony in a persistent game world. Details are the main focus, not graphics",
+            "A settlement and colony simulation project focused on families, jobs, food, resources and NPC behaviour.",
 
-        path: "./vq-settlement/",
+        path:
+            "./vq-settlement/",
 
-        image: "",
-
-        featured: false,
+        featured:
+            false,
 
         tags: [
-            "2D",
-            "PIXEL ART",
+
             "SIMULATION",
-            "colony"
+
+            "SETTLEMENT",
+
+            "NPC",
+
+            "COLONY"
+
         ]
+
     }
 
 ];
 
 
 
-/*
-    Add development updates here.
+/* =========================================================
+   NEWS / DEVELOPMENT LOG
 
-    Newest entry should be at the TOP.
-*/
-
+   Put newest posts first.
+   ========================================================= */
 
 const news = [
 
-    {
-        date: "27 SEP 2026, 01:51 (UTC+2)",
-
-        game: "Void Quest RPG",
-
-        title: "Change log",
-
-        text:
-            "Further decisions with the voidquest team have changed the direction if vq rpg's visuals. The game is now being developed in ascii graphics to spare time one making visual graphics. This is to keep the comlexity of the game as a priority. Take a look at the games development progress on the games tab and click play on VQ RPG."
-    },
 
     {
-        date: "21 SEP 2026, 12:45 (UTC+2)",
 
-        game: "Void Quest RPG",
+        date:
+            "27 SEP 2026",
 
-        title: "Change log",
+        game:
+            "VQ RPG",
 
-        text:
-            "Mechanics added: Enemy system, loot drops, enemy aggro, small combat (turn based), game/combat log."
-    },
-
-    {
-        date: "21 SEP 2026, 01:51 (UTC+2)",
-
-        game: "Void Quest RPG",
-
-        title: "New RPG in the works",
+        title:
+            "VQ RPG moves to ASCII graphics",
 
         text:
-            "Another branch of the VQ world has been made. Welcome to the development of VQ-RPG! We will just call it that for now, and find a real name later. This is a game that is supposed to attract those who are more interested in a rpg experience, where you make your own character, adventure, where every choice and path matters, where you can go from peasant to king. Every thing is up to you. And as always, we are trying to keep the graphics low, or better said, we are trying to keep the focus on details, mechanics, relations, worldbuilding and make an overal better experience for the players that like endless content. And the game will of course be playable while we code and develope it! "
-    },
+            "Development has moved toward ASCII graphics. This allows more development time to go into simulation, world systems, NPCs, factions and gameplay instead of spending most of the time creating graphical assets."
 
-    {
-        date: "19 AUG 2026, 22:44 (UTC+2)",
-
-        game: "VQ-Settlement",
-
-        title: "Pre-apha game are now playable to test",
-
-        text:
-            "Everyone can now be apart of the development process and test the game while we add features. The game are still in the early phase. Just click the PLAY button on the main page! "
-    },
-
-    {
-        date: "17 AUG 2026",
-
-        game: "VOIDQUEST",
-
-        title: "VoidQuest Launcher development started",
-
-        text:
-            "Development has begun on a central launcher and archive for all current and future VoidQuest projects."
     },
 
 
+
     {
-        date: "17 AUG 2026",
 
-        game: "VQ SETTLEMENT",
+        date:
+            "21 SEP 2026",
 
-        title: "VQ Settlement added to the archive",
+        game:
+            "VQ RPG",
+
+        title:
+            "Combat systems added",
 
         text:
-            "The settlement project is now part of the main VoidQuest project structure."
+            "Enemy behaviour, loot drops, aggro, basic turn based combat and a game/combat log have been added."
+
     },
 
 
+
     {
-        date: "17 AUG 2026",
 
-        game: "VQ DUNGEONS",
+        date:
+            "21 SEP 2026",
 
-        title: "VQ Dungeons development on pause",
+        game:
+            "VQ RPG",
+
+        title:
+            "New RPG project started",
 
         text:
-            "The dungeon crawler VQ Dungeons are sat on pause, because of the success of VQ-Settlement."
+            "Work has started on a new open world RPG project. The goal is to build a game where the player can explore freely while settlements, people, families and factions continue to exist and change around them."
+
+    },
+
+
+
+    {
+
+        date:
+            "19 AUG 2026",
+
+        game:
+            "VQ Settlement",
+
+        title:
+            "Pre-alpha available",
+
+        text:
+            "The early settlement project became playable directly through the VoidQuest website."
+
+    },
+
+
+
+    {
+
+        date:
+            "17 AUG 2026",
+
+        game:
+            "VOIDQUEST",
+
+        title:
+            "VoidQuest website created",
+
+        text:
+            "The VoidQuest website was created as a permanent home for current games, old projects, development logs and playable builds."
+
     }
 
 ];
@@ -182,138 +200,205 @@ const news = [
 
 
 /* =========================================================
-   ELEMENTS
+   DOM ELEMENTS
    ========================================================= */
 
-const navButtons =
-    document.querySelectorAll(".nav-button");
+const pages =
+    document.querySelectorAll(
+        ".page"
+    );
 
-const sections =
-    document.querySelectorAll(".page-section");
 
-const pageTitle =
-    document.getElementById("pageTitle");
+const navigationButtons =
+    document.querySelectorAll(
+        ".nav-button"
+    );
+
 
 const featuredGameContainer =
-    document.getElementById("featuredGame");
+    document.getElementById(
+        "featured-game"
+    );
 
-const homeGames =
-    document.getElementById("homeGames");
 
-const allGames =
-    document.getElementById("allGames");
+const gamesList =
+    document.getElementById(
+        "games-list"
+    );
+
 
 const homeNews =
-    document.getElementById("homeNews");
+    document.getElementById(
+        "home-news"
+    );
 
-const allNews =
-    document.getElementById("allNews");
 
-const toast =
-    document.getElementById("toast");
+const newsList =
+    document.getElementById(
+        "news-list"
+    );
 
 
 
 /* =========================================================
-   NAVIGATION
+   PAGE NAVIGATION
    ========================================================= */
 
-function openSection(sectionName) {
-
-    sections.forEach(section => {
-
-        section.classList.remove("active");
-
-    });
+function openPage(
+    pageName
+) {
 
 
-    navButtons.forEach(button => {
+    pages.forEach(
 
-        button.classList.remove("active");
+        page => {
 
-    });
+            page.classList.remove(
+                "active"
+            );
 
+        }
 
-    const targetSection =
-        document.getElementById(sectionName);
-
-
-    const targetButton =
-        document.querySelector(
-            `[data-section="${sectionName}"]`
-        );
-
-
-    if (targetSection) {
-
-        targetSection.classList.add("active");
-
-    }
-
-
-    if (targetButton) {
-
-        targetButton.classList.add("active");
-
-    }
-
-
-    pageTitle.textContent =
-        sectionName.toUpperCase();
-
-
-    localStorage.setItem(
-        "voidquest-section",
-        sectionName
     );
 
 
+
+    navigationButtons.forEach(
+
+        button => {
+
+            button.classList.remove(
+                "active"
+            );
+
+        }
+
+    );
+
+
+
+    const page =
+        document.getElementById(
+            pageName
+        );
+
+
+    if (page) {
+
+        page.classList.add(
+            "active"
+        );
+
+    }
+
+
+
+    const navigationButton =
+        document.querySelector(
+
+            `[data-page="${pageName}"]`
+
+        );
+
+
+    if (navigationButton) {
+
+        navigationButton.classList.add(
+            "active"
+        );
+
+    }
+
+
+
+    localStorage.setItem(
+
+        "voidquest-page",
+
+        pageName
+
+    );
+
+
+
     window.scrollTo({
-        top: 0,
-        behavior: "smooth"
+
+        top:
+            0,
+
+        behavior:
+            "instant"
+
     });
 
 }
 
 
 
-navButtons.forEach(button => {
+/* =========================================================
+   NAV BUTTONS
+   ========================================================= */
 
-    button.addEventListener("click", () => {
+navigationButtons.forEach(
 
-        const section =
-            button.dataset.section;
-
-        openSection(section);
-
-    });
-
-});
+    button => {
 
 
+        button.addEventListener(
 
-/* Buttons like VIEW ALL */
+            "click",
+
+            () => {
+
+
+                openPage(
+
+                    button.dataset.page
+
+                );
+
+            }
+
+        );
+
+    }
+
+);
+
+
+
+/* =========================================================
+   INTERNAL PAGE LINKS
+   ========================================================= */
 
 document.addEventListener(
+
     "click",
+
     event => {
+
 
         const button =
             event.target.closest(
-                "[data-open-section]"
+                "[data-open-page]"
             );
 
 
         if (!button) {
+
             return;
+
         }
 
 
-        openSection(
-            button.dataset.openSection
+        openPage(
+
+            button.dataset.openPage
+
         );
 
     }
+
 );
 
 
@@ -324,92 +409,84 @@ document.addEventListener(
 
 function renderFeaturedGame() {
 
+
     const game =
-        games.find(game => game.featured)
-        || games[0];
+        games.find(
+
+            game =>
+                game.featured
+
+        ) || games[0];
+
 
 
     if (!game) {
+
         return;
+
     }
 
 
-    const backgroundStyle =
-        game.image
-        ? `background-image: url('${game.image}')`
-        : "";
 
-
-    const tagsHTML =
+    const tags =
         game.tags
+
             .map(
+
                 tag =>
-                    `<span class="meta-tag">${tag}</span>`
+                    `[ ${tag} ]`
+
             )
-            .join("");
+
+            .join(
+                " "
+            );
+
 
 
     featuredGameContainer.innerHTML = `
 
-        <div
-            class="featured-background"
-            style="${backgroundStyle}"
-        ></div>
+
+        <h2>
+
+            ${game.title}
+
+        </h2>
 
 
-        ${
-            !game.image
-            ? `
-                <div class="featured-placeholder">
-                    VQ
-                </div>
-            `
-            : ""
-        }
+        <div class="featured-status">
 
-
-        <div class="featured-content">
-
-            <span class="featured-label">
-                ◆ FEATURED PROJECT
-            </span>
-
-
-            <h2>
-                ${game.title}
-            </h2>
-
-
-            <p>
-                ${game.description}
-            </p>
-
-
-            <div class="game-meta">
-                ${tagsHTML}
-            </div>
-
-
-            <div class="button-row">
-
-                <button
-                    class="primary-button"
-                    data-launch="${game.id}"
-                >
-                    PLAY GAME
-                </button>
-
-
-                <button
-                    class="secondary-button"
-                    data-open-section="games"
-                >
-                    PROJECT INFO
-                </button>
-
-            </div>
+            ${game.status}
 
         </div>
+
+
+        <p>
+
+            ${game.description}
+
+        </p>
+
+
+        <div class="featured-tags">
+
+            ${tags}
+
+        </div>
+
+
+        <p style="text-align:center; margin-top:14px;">
+
+            <a
+                href="${game.path}"
+                class="game-play-link"
+            >
+
+                PLAY CURRENT BUILD
+
+            </a>
+
+        </p>
 
     `;
 
@@ -418,176 +495,174 @@ function renderFeaturedGame() {
 
 
 /* =========================================================
-   GAME CARDS
+   GAMES LIST
    ========================================================= */
 
-function createGameCard(game) {
+function renderGames() {
 
-    const imageHTML =
-        game.image
 
-        ? `
-            <div
-                class="game-art-background"
-                style="
-                    background-image:
-                    url('${game.image}');
-                "
-            ></div>
-        `
+    gamesList.innerHTML =
 
-        : `
-            <span
-                class="game-art-placeholder"
-            >
-                ${game.shortTitle}
-            </span>
-        `;
+        games
+
+            .map(
+
+                game => {
+
+
+                    const tags =
+
+                        game.tags
+
+                            .map(
+
+                                tag =>
+                                    `[${tag}]`
+
+                            )
+
+                            .join(
+                                " "
+                            );
+
+
+
+                    return `
+
+
+                        <article class="game-entry">
+
+
+                            <div class="game-entry-header">
+
+
+                                <strong>
+
+                                    ${game.title}
+
+                                </strong>
+
+
+                                <span class="game-entry-status">
+
+                                    ${game.status}
+
+                                </span>
+
+
+                            </div>
+
+
+                            <div class="game-entry-body">
+
+
+                                <div class="game-tags">
+
+                                    ${game.type}
+
+                                    <br>
+
+                                    ${tags}
+
+                                </div>
+
+
+                                <p>
+
+                                    ${game.description}
+
+                                </p>
+
+
+                                <a
+                                    href="${game.path}"
+                                    class="game-play-link"
+                                >
+
+                                    &gt;&gt; PLAY GAME
+
+                                </a>
+
+
+                            </div>
+
+
+                        </article>
+
+                    `;
+
+                }
+
+            )
+
+            .join(
+                ""
+            );
+
+}
+
+
+
+/* =========================================================
+   CREATE NEWS ENTRY
+   ========================================================= */
+
+function createNewsEntry(
+    item
+) {
 
 
     return `
 
-        <article class="game-card">
 
-            <div class="game-art">
+        <article class="news-entry">
 
-                ${imageHTML}
+
+            <div class="news-header">
+
+
+                <span class="news-date">
+
+                    ${item.date}
+
+                </span>
+
+
+                <span class="news-game">
+
+                    ${item.game}
+
+                </span>
+
 
             </div>
 
 
-            <div class="game-card-content">
-
-                <div class="game-status">
-
-                    <span class="status-light"></span>
-
-                    ${game.status}
-
-                </div>
+            <div class="news-body">
 
 
                 <h3>
-                    ${game.title}
+
+                    ${item.title}
+
                 </h3>
 
 
                 <p>
-                    ${game.description}
+
+                    ${item.text}
+
                 </p>
 
 
-                <div class="game-card-footer">
-
-                    <span class="game-type">
-                        ${game.type}
-                    </span>
-
-
-                    <button
-                        class="card-play-button"
-                        data-launch="${game.id}"
-                    >
-                        PLAY →
-                    </button>
-
-                </div>
-
             </div>
+
 
         </article>
 
     `;
 
 }
-
-
-
-function renderGames() {
-
-    /*
-        Home currently displays
-        only the first two games.
-    */
-
-    homeGames.innerHTML =
-        games
-            .slice(0, 2)
-            .map(createGameCard)
-            .join("");
-
-
-    /*
-        Games page displays everything.
-    */
-
-    allGames.innerHTML =
-        games
-            .map(createGameCard)
-            .join("");
-
-}
-
-
-
-/* =========================================================
-   GAME LAUNCHING
-   ========================================================= */
-
-document.addEventListener(
-    "click",
-    event => {
-
-        const button =
-            event.target.closest(
-                "[data-launch]"
-            );
-
-
-        if (!button) {
-            return;
-        }
-
-
-        const gameId =
-            button.dataset.launch;
-
-
-        const game =
-            games.find(
-                game => game.id === gameId
-            );
-
-
-        if (!game) {
-
-            showToast(
-                "PROJECT NOT FOUND"
-            );
-
-            return;
-        }
-
-
-        showToast(
-            `LAUNCHING ${game.title.toUpperCase()}...`
-        );
-
-
-        /*
-            Small delay simply makes it
-            feel a little more like a launcher.
-        */
-
-        setTimeout(() => {
-
-            window.location.href =
-                game.path;
-
-        }, 350);
-
-    }
-);
 
 
 
@@ -595,93 +670,49 @@ document.addEventListener(
    NEWS
    ========================================================= */
 
-function createNewsItem(item) {
-
-    return `
-
-        <article class="news-item">
-
-            <div class="news-date">
-                ${item.date}
-            </div>
-
-
-            <div class="news-game">
-                ${item.game}
-            </div>
-
-
-            <div class="news-content">
-
-                <h3>
-                    ${item.title}
-                </h3>
-
-
-                <p>
-                    ${item.text}
-                </p>
-
-            </div>
-
-        </article>
-
-    `;
-
-}
-
-
-
 function renderNews() {
 
+
     /*
-        Home displays latest 3.
+        Home page only shows
+        the newest three posts.
     */
 
     homeNews.innerHTML =
+
         news
-            .slice(0, 3)
-            .map(createNewsItem)
-            .join("");
+
+            .slice(
+                0,
+                3
+            )
+
+            .map(
+                createNewsEntry
+            )
+
+            .join(
+                ""
+            );
+
 
 
     /*
-        News page displays all.
+        Development page shows
+        everything.
     */
 
-    allNews.innerHTML =
+    newsList.innerHTML =
+
         news
-            .map(createNewsItem)
-            .join("");
 
-}
+            .map(
+                createNewsEntry
+            )
 
-
-
-/* =========================================================
-   TOAST
-   ========================================================= */
-
-let toastTimer;
-
-
-
-function showToast(message) {
-
-    toast.textContent = message;
-
-    toast.classList.add("show");
-
-
-    clearTimeout(toastTimer);
-
-
-    toastTimer =
-        setTimeout(() => {
-
-            toast.classList.remove("show");
-
-        }, 2200);
+            .join(
+                ""
+            );
 
 }
 
@@ -693,26 +724,48 @@ function showToast(message) {
 
 function updateClock() {
 
+
     const clock =
-        document.getElementById("clock");
+        document.getElementById(
+            "clock"
+        );
+
+
+    if (!clock) {
+
+        return;
+
+    }
+
 
 
     const now =
         new Date();
 
 
+
     const hours =
-        now
-            .getHours()
-            .toString()
-            .padStart(2, "0");
+        String(
+            now.getHours()
+        )
+
+        .padStart(
+            2,
+            "0"
+        );
+
 
 
     const minutes =
-        now
-            .getMinutes()
-            .toString()
-            .padStart(2, "0");
+        String(
+            now.getMinutes()
+        )
+
+        .padStart(
+            2,
+            "0"
+        );
+
 
 
     clock.textContent =
@@ -722,89 +775,62 @@ function updateClock() {
 
 
 
-setInterval(
-    updateClock,
-    1000
-);
-
-
-
 updateClock();
 
 
+setInterval(
 
-/* =========================================================
-   KEYBOARD SHORTCUTS
-   ========================================================= */
+    updateClock,
 
-/*
+    1000
 
-    1 = Home
-    2 = Games
-    3 = News
-    4 = About
-
-*/
-
-document.addEventListener(
-    "keydown",
-    event => {
-
-        if (event.key === "1") {
-            openSection("home");
-        }
-
-        if (event.key === "2") {
-            openSection("games");
-        }
-
-        if (event.key === "3") {
-            openSection("news");
-        }
-
-        if (event.key === "4") {
-            openSection("about");
-        }
-
-    }
 );
 
 
 
 /* =========================================================
-   START LAUNCHER
+   START WEBSITE
    ========================================================= */
 
-function startLauncher() {
+function startWebsite() {
+
 
     renderFeaturedGame();
 
+
     renderGames();
+
 
     renderNews();
 
 
-    /*
-        Remember the page the user
-        had open last time.
-    */
 
-    const savedSection =
+    const savedPage =
         localStorage.getItem(
-            "voidquest-section"
+            "voidquest-page"
         );
 
 
+
     if (
-        savedSection &&
-        document.getElementById(savedSection)
+        savedPage &&
+        document.getElementById(
+            savedPage
+        )
     ) {
 
-        openSection(savedSection);
+
+        openPage(
+            savedPage
+        );
+
 
     } else {
 
-        openSection("home");
+
+        openPage(
+            "home"
+        );
 
     }
 
@@ -812,4 +838,4 @@ function startLauncher() {
 
 
 
-startLauncher();
+startWebsite();

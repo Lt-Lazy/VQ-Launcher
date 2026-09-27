@@ -16,7 +16,7 @@ const ctx = canvas.getContext("2d");
 const WORLD_WIDTH = 300;
 const WORLD_HEIGHT = 300;
 
-const WORLD_SEED = 1514162;
+const WORLD_SEED = 27252311;
 
 /* =========================================================
    WORLD GENERATION SETTINGS

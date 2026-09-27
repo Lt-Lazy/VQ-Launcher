@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
+
     <meta charset="UTF-8">
 
     <meta
@@ -10,441 +12,673 @@
 
     <meta
         name="description"
-        content="VoidQuest - Games, projects and worlds."
+        content="VoidQuest - games, development logs and strange little worlds."
     >
 
-    <title>VoidQuest Launcher</title>
+    <title>VoidQuest</title>
 
-    <link rel="stylesheet" href="style.css">
+    <link
+        rel="stylesheet"
+        href="style.css"
+    >
+
 </head>
+
 
 <body>
 
-    <!-- Background decoration -->
-    <div class="background-grid"></div>
-    <div class="screen-noise"></div>
 
-    <div class="launcher">
+    <!-- =========================================================
+         MAIN WEBSITE
+    ========================================================== -->
 
-        <!-- =========================================
-             LEFT SIDEBAR
-        ========================================== -->
-        <aside class="sidebar">
+    <div id="website">
 
-            <div class="brand">
 
-                <div class="brand-icon">
-                    <img src="/assets/logo.png" alt="">
+        <!-- =====================================================
+             HEADER
+        ====================================================== -->
+
+        <header id="header">
+
+
+            <div id="title-area">
+
+
+                <img
+                    src="assets/logo.png"
+                    alt="VoidQuest"
+                    id="logo"
+                >
+
+
+                <div>
+
+                    <h1>
+                        VOIDQUEST
+                    </h1>
+
+                    <div id="subtitle">
+                        games, worlds & unfinished ideas
+                    </div>
+
                 </div>
 
-                <div class="brand-text">
-                    <h1>VOIDQUEST</h1>
-                    <span>PROJECT LAUNCHER</span>
-                </div>
 
             </div>
 
 
-            <div class="sidebar-divider"></div>
+
+            <div id="header-note">
+
+                personal hobby game development page
+
+                <br>
+
+                made with html / css / javascript
+
+            </div>
 
 
-            <!-- Navigation -->
-            <nav class="navigation">
+
+            <!-- =================================================
+                 NAVIGATION
+            ================================================== -->
+
+            <nav id="navigation">
+
 
                 <button
                     class="nav-button active"
-                    data-section="home"
+                    data-page="home"
+                    type="button"
                 >
-                    <span class="nav-symbol">◆</span>
-                    HOME
+                    Home
                 </button>
 
 
                 <button
                     class="nav-button"
-                    data-section="games"
+                    data-page="games"
+                    type="button"
                 >
-                    <span class="nav-symbol">■</span>
-                    GAMES
+                    Games
                 </button>
 
 
                 <button
                     class="nav-button"
-                    data-section="news"
+                    data-page="news"
+                    type="button"
                 >
-                    <span class="nav-symbol">+</span>
-                    NEWS
+                    Development
                 </button>
 
 
                 <button
                     class="nav-button"
-                    data-section="about"
+                    data-page="about"
+                    type="button"
                 >
-                    <span class="nav-symbol">?</span>
-                    ABOUT
+                    About
                 </button>
+
+
+                <button
+                    class="nav-button"
+                    data-page="links"
+                    type="button"
+                >
+                    Links
+                </button>
+
 
             </nav>
 
 
-            <div class="sidebar-spacer"></div>
+        </header>
 
 
-            <!-- Small project information -->
-            <div class="sidebar-status">
 
-                <div class="sidebar-status-title">
-                    LAUNCHER STATUS
-                </div>
+        <!-- =====================================================
+             LITTLE STATUS BAR
+        ====================================================== -->
 
-                <div class="status-row">
-                    <span class="status-light"></span>
-                    <span>WEB BUILD ONLINE</span>
-                </div>
+        <div id="status-line">
 
-                <div class="status-info">
-                    voidquest.org
-                </div>
+            <span>
+                VOIDQUEST.ORG
+            </span>
 
-            </div>
+            <span>
+                SITE STATUS:
+                <strong>ONLINE</strong>
+            </span>
 
-        </aside>
-
-
-        <!-- =========================================
-             MAIN AREA
-        ========================================== -->
-        <div class="main-area">
-
-
-            <!-- TOP BAR -->
-            <header class="topbar">
-
-                <div>
-                    <span class="topbar-label">VOIDQUEST NETWORK</span>
-                    <span class="topbar-separator">//</span>
-                    <span id="pageTitle">HOME</span>
-                </div>
-
-                <div class="topbar-right">
-                    <span id="clock">00:00</span>
-                </div>
-
-            </header>
-
-
-            <!-- =====================================
-                 CONTENT
-            ====================================== -->
-            <main class="content">
-
-
-                <!-- =================================
-                     HOME
-                ================================== -->
-                <section
-                    id="home"
-                    class="page-section active"
-                >
-
-                    <!-- FEATURED GAME -->
-                    <div
-                        class="featured-game"
-                        id="featuredGame"
-                    >
-                        <!-- Filled by JavaScript -->
-                    </div>
-
-
-                    <div class="section-header">
-
-                        <div>
-                            <span class="section-index">
-                                01
-                            </span>
-
-                            <h2>
-                                PROJECTS
-                            </h2>
-                        </div>
-
-                        <button
-                            class="text-button"
-                            data-open-section="games"
-                        >
-                            VIEW ALL →
-                        </button>
-
-                    </div>
-
-
-                    <div
-                        class="game-grid"
-                        id="homeGames"
-                    >
-                        <!-- Filled by JavaScript -->
-                    </div>
-
-
-                    <!-- Updates -->
-                    <div class="section-header updates-header">
-
-                        <div>
-                            <span class="section-index">
-                                02
-                            </span>
-
-                            <h2>
-                                LATEST UPDATES
-                            </h2>
-                        </div>
-
-                        <button
-                            class="text-button"
-                            data-open-section="news"
-                        >
-                            ALL NEWS →
-                        </button>
-
-                    </div>
-
-
-                    <div
-                        class="news-list"
-                        id="homeNews"
-                    >
-                        <!-- Filled by JavaScript -->
-                    </div>
-
-                </section>
-
-
-
-                <!-- =================================
-                     GAMES
-                ================================== -->
-                <section
-                    id="games"
-                    class="page-section"
-                >
-
-                    <div class="page-heading">
-
-                        <span class="eyebrow">
-                            VOIDQUEST ARCHIVE
-                        </span>
-
-                        <h2>
-                            GAMES & PROJECTS
-                        </h2>
-
-                        <p>
-                            A collection of worlds, prototypes
-                            and experiments created under
-                            VoidQuest.
-                        </p>
-
-                    </div>
-
-
-                    <div
-                        class="game-grid large-grid"
-                        id="allGames"
-                    >
-                        <!-- Filled by JavaScript -->
-                    </div>
-
-                </section>
-
-
-
-                <!-- =================================
-                     NEWS
-                ================================== -->
-                <section
-                    id="news"
-                    class="page-section"
-                >
-
-                    <div class="page-heading">
-
-                        <span class="eyebrow">
-                            DEVELOPER LOG
-                        </span>
-
-                        <h2>
-                            NEWS & UPDATES
-                        </h2>
-
-                        <p>
-                            Development logs, game updates
-                            and VoidQuest announcements.
-                        </p>
-
-                    </div>
-
-
-                    <div
-                        class="news-list full-news-list"
-                        id="allNews"
-                    >
-                        <!-- Filled by JavaScript -->
-                    </div>
-
-                </section>
-
-
-
-                <!-- =================================
-                     ABOUT
-                ================================== -->
-                <section
-                    id="about"
-                    class="page-section"
-                >
-
-                    <div class="page-heading">
-
-                        <span class="eyebrow">
-                            ABOUT THE PROJECT
-                        </span>
-
-                        <h2>
-                            VOIDQUEST
-                        </h2>
-
-                    </div>
-
-
-                    <div class="about-layout">
-
-                        <div class="about-panel">
-
-                            <h3>
-                                WHAT IS VOIDQUEST?
-                            </h3>
-
-                            <p>
-                                VoidQuest is my personal collection
-                                of games, experiments and worlds.
-                            </p>
-
-                            <p>
-                                Most projects are inspired by
-                                old-school RPGs, MMORPGs,
-                                dungeon crawlers and pixel-art games.
-                            </p>
-
-                            <p>
-                                This launcher acts as the central
-                                hub for every VoidQuest project.
-                            </p>
-
-                        </div>
-
-
-                        <div class="about-panel">
-
-                            <h3>
-                                CURRENT FOCUS
-                            </h3>
-
-                            <div class="info-row">
-                                <span>PROJECTS</span>
-                                <strong>2</strong>
-                            </div>
-
-                            <div class="info-row">
-                                <span>PLATFORM</span>
-                                <strong>WEB</strong>
-                            </div>
-
-                            <div class="info-row">
-                                <span>ENGINE</span>
-                                <strong>HTML / JS</strong>
-                            </div>
-
-                            <div class="info-row">
-                                <span>STATUS</span>
-                                <strong>IN DEVELOPMENT</strong>
-                            </div>
-
-                        </div>
-
-
-                        <div class="about-panel about-wide">
-
-                            <h3>
-                                THE VOIDQUEST ARCHIVE
-                            </h3>
-
-                            <p>
-                                One of the goals of this website is
-                                to keep old projects alive instead
-                                of letting them disappear when
-                                development stops.
-                            </p>
-
-                            <p>
-                                Finished games, abandoned prototypes
-                                and active projects can all remain
-                                available here as part of the
-                                VoidQuest archive.
-                            </p>
-
-                            <p>
-                                And just to keep it clear, i am not a professional.
-                                This is my hobby and i want to have my development journey avaliable while i program.
-                                My end goal is to publish my game on steam. But my website is more than good enough for now.
-                            </p>
-
-                        </div>
-
-                    </div>
-
-                </section>
-
-            </main>
-
-
-            <!-- =====================================
-                 BOTTOM STATUS BAR
-            ====================================== -->
-            <footer class="statusbar">
-
-                <div>
-                    VOIDQUEST LAUNCHER
-                    <span class="dim">v0.1</span>
-                </div>
-
-                <div class="statusbar-center">
-                    <span class="status-light"></span>
-                    SYSTEM READY
-                </div>
-
-                <div>
-                    VOIDQUEST.ORG
-                </div>
-
-            </footer>
+            <span id="clock">
+                00:00
+            </span>
 
         </div>
 
-    </div>
 
 
-    <!-- Small popup message -->
-    <div
-        id="toast"
-        class="toast"
-    >
-        Message
+        <!-- =====================================================
+             CONTENT
+        ====================================================== -->
+
+        <main id="content">
+
+
+            <!-- =================================================
+                 HOME
+            ================================================== -->
+
+            <section
+                id="home"
+                class="page active"
+            >
+
+
+                <div class="welcome-box">
+
+
+                    <h2>
+                        Welcome to VoidQuest
+                    </h2>
+
+
+                    <p>
+
+                        This is the home of my game projects,
+                        experiments and development logs.
+
+                    </p>
+
+
+                    <p>
+
+                        Most things here are unfinished.
+                        Some things may break.
+                        Some projects may disappear for six months
+                        and suddenly come back.
+
+                    </p>
+
+
+                    <p>
+
+                        That's kind of the point.
+
+                    </p>
+
+
+                </div>
+
+
+
+                <!-- =============================================
+                     CURRENT GAME
+                ============================================== -->
+
+                <div class="section-heading">
+
+                    CURRENT PROJECT
+
+                </div>
+
+
+                <div
+                    id="featured-game"
+                    class="featured-game"
+                >
+                </div>
+
+
+
+                <!-- =============================================
+                     DOWNLOAD / PLAY LINKS
+                ============================================== -->
+
+                <div class="quick-links">
+
+
+                    <a
+                        href="./vq-rpg-ascii/"
+                        class="big-link"
+                    >
+                        PLAY VQ RPG
+                    </a>
+
+
+                    <a
+                        href="./vq-settlement/"
+                        class="big-link"
+                    >
+                        PLAY VQ SETTLEMENT
+                    </a>
+
+
+                </div>
+
+
+
+                <!-- =============================================
+                     NEWS
+                ============================================== -->
+
+                <div class="section-heading">
+
+                    LATEST NEWS
+
+                </div>
+
+
+                <div id="home-news">
+                </div>
+
+
+                <div class="more-link">
+
+                    <button
+                        type="button"
+                        data-open-page="news"
+                    >
+                        View all development posts
+                    </button>
+
+                </div>
+
+
+            </section>
+
+
+
+            <!-- =================================================
+                 GAMES
+            ================================================== -->
+
+            <section
+                id="games"
+                class="page"
+            >
+
+
+                <h2 class="page-title">
+
+                    Games & Projects
+
+                </h2>
+
+
+                <p class="intro-text">
+
+                    A list of projects I've worked on.
+                    Active games, old experiments and things
+                    that may or may not ever be finished.
+
+                </p>
+
+
+                <div id="games-list">
+                </div>
+
+
+            </section>
+
+
+
+            <!-- =================================================
+                 DEVELOPMENT / NEWS
+            ================================================== -->
+
+            <section
+                id="news"
+                class="page"
+            >
+
+
+                <h2 class="page-title">
+
+                    Development Log
+
+                </h2>
+
+
+                <p class="intro-text">
+
+                    Newest posts are at the top.
+
+                </p>
+
+
+                <div id="news-list">
+                </div>
+
+
+            </section>
+
+
+
+            <!-- =================================================
+                 ABOUT
+            ================================================== -->
+
+            <section
+                id="about"
+                class="page"
+            >
+
+
+                <h2 class="page-title">
+
+                    About VoidQuest
+
+                </h2>
+
+
+                <div class="old-box">
+
+
+                    <h3>
+                        What is this?
+                    </h3>
+
+
+                    <p>
+
+                        VoidQuest is my personal collection of games,
+                        prototypes and game development experiments.
+
+                    </p>
+
+
+                    <p>
+
+                        I enjoy making games where systems, simulation,
+                        worldbuilding and player freedom matter more
+                        than fancy graphics.
+
+                    </p>
+
+
+                </div>
+
+
+
+                <div class="old-box">
+
+
+                    <h3>
+                        Who makes this?
+                    </h3>
+
+
+                    <p>
+
+                        Me.
+
+                    </p>
+
+
+                    <p>
+
+                        I'm not a professional game developer.
+                        This is a hobby and a place where I can keep
+                        everything I've made instead of losing old
+                        projects every time I start something new.
+
+                    </p>
+
+
+                </div>
+
+
+
+                <div class="old-box">
+
+
+                    <h3>
+                        What do I use?
+                    </h3>
+
+
+                    <table class="info-table">
+
+
+                        <tr>
+
+                            <td>
+                                Programming
+                            </td>
+
+                            <td>
+                                HTML / CSS / JavaScript
+                            </td>
+
+                        </tr>
+
+
+                        <tr>
+
+                            <td>
+                                Editor
+                            </td>
+
+                            <td>
+                                Visual Studio Code
+                            </td>
+
+                        </tr>
+
+
+                        <tr>
+
+                            <td>
+                                Hosting
+                            </td>
+
+                            <td>
+                                GitHub Pages
+                            </td>
+
+                        </tr>
+
+
+                        <tr>
+
+                            <td>
+                                Website
+                            </td>
+
+                            <td>
+                                voidquest.org
+                            </td>
+
+                        </tr>
+
+
+                        <tr>
+
+                            <td>
+                                Main project
+                            </td>
+
+                            <td>
+                                VQ RPG
+                            </td>
+
+                        </tr>
+
+
+                    </table>
+
+
+                </div>
+
+
+
+                <div class="old-box warning-box">
+
+
+                    <strong>
+                        WARNING
+                    </strong>
+
+
+                    <p>
+
+                        Expect unfinished features,
+                        placeholders, strange bugs
+                        and questionable design decisions.
+
+                    </p>
+
+
+                </div>
+
+
+            </section>
+
+
+
+            <!-- =================================================
+                 LINKS
+            ================================================== -->
+
+            <section
+                id="links"
+                class="page"
+            >
+
+
+                <h2 class="page-title">
+
+                    Links
+
+                </h2>
+
+
+                <div class="old-box">
+
+
+                    <h3>
+                        VoidQuest
+                    </h3>
+
+
+                    <ul class="link-list">
+
+
+                        <li>
+
+                            <a href="/">
+                                voidquest.org
+                            </a>
+
+                        </li>
+
+
+                        <li>
+
+                            <a href="https://www.pixilart.com/ltlazy">
+                                Pixilart
+                            </a>
+
+                        </li>
+
+
+                        <li>
+
+                            <a href="./vq-settlement/">
+                                VQ Settlement
+                            </a>
+
+                        </li>
+
+
+                    </ul>
+
+
+                </div>
+
+
+
+                <div class="old-box">
+
+
+                    <h3>
+                        Other stuff
+                    </h3>
+
+
+                    <p>
+
+                        More links can be added here later.
+
+                    </p>
+
+
+                    <p>
+
+                        Downloads, screenshots,
+                        Discord, Steam or whatever else
+                        VoidQuest ends up using.
+
+                    </p>
+
+
+                </div>
+
+
+            </section>
+
+
+        </main>
+
+
+
+        <!-- =====================================================
+             FOOTER
+        ====================================================== -->
+
+        <footer id="footer">
+
+
+            <div>
+
+                VOIDQUEST
+
+            </div>
+
+
+            <div>
+
+                Built badly on purpose.
+
+            </div>
+
+
+            <div>
+
+                Last updated:
+                <span id="last-updated">
+                    27 September 2026
+                </span>
+
+            </div>
+
+
+        </footer>
+
+
     </div>
+
 
 
     <script src="script.js"></script>
 
+
 </body>
+
 </html>

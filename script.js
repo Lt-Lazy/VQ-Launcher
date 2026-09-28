@@ -106,6 +106,35 @@ const games = [
 
 const news = [
 
+    {
+
+        date:
+            "29 SEP 2026",
+
+        game:
+            "VQ RPG",
+
+        title:
+            "Update Notes - crafting/vegetation",
+
+        text:
+            "Added crafting system, with starter items for testing, added more vegetation, grows based on biome and ground type, added cooking/campfire system. Remember if you are testing the game and have found out how to make a campfire, you need to interact with the campfire and light it, with firestarter, after that the cooking recipes will be added to the crafting tab. Only one type of cooking recipe is added, for testing. Can you make it ? :)  "
+    },
+
+    {
+
+        date:
+            "29 SEP 2026",
+
+        game:
+            "VQ RPG",
+
+        title:
+            "Update Notes - World generation",
+
+        text:
+            "Just some info about the world generation. The world is 100% procedural, seed based, the same seed will always generate the same geography, climate, rivers, streams, resources and settlements. Elevation is generated as different values, and the values determines where sea level, shallow and deep, coast, beach, lowland, hills and mountains will be. Climate is under progress, but we have climate based on latitude, this determines regiones with colder/warmer statuses, that helps with moisture levels in every biome/zones. Rainfall and runoff are calculated from moisture, elevation and temperature. Higher terrain creates additional rivers, that make streams that follows the path where elevation goes down. Vegetaion and natural resources are also connected the many of these factors, and natural resources are used by the npc's to determine where cities are built."
+    },
 
     {
 
@@ -122,25 +151,6 @@ const news = [
             "Development has moved toward ASCII graphics. This allows more development time to go into simulation, world systems, NPCs, factions and gameplay instead of spending most of the time creating graphical assets."
 
     },
-
-
-
-    {
-
-        date:
-            "21 SEP 2026",
-
-        game:
-            "VQ RPG",
-
-        title:
-            "Combat systems added",
-
-        text:
-            "Enemy behaviour, loot drops, aggro, basic turn based combat and a game/combat log have been added."
-
-    },
-
 
 
     {

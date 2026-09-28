@@ -25,7 +25,7 @@ const minimapCtx =
 const WORLD_WIDTH = 300;
 const WORLD_HEIGHT = 300;
 
-const WORLD_SEED = 295710422;
+const WORLD_SEED = 912444442;
 
 /* =========================================================
    WORLD GENERATION SETTINGS
@@ -325,6 +325,41 @@ function registerWorldObjectDefinition(
                 definition.color ??
                 "#777777",
 
+            blocksMovement:
+                definition.blocksMovement ===
+                true,
+
+            structureType:
+                definition.structureType ??
+                null,
+
+            litDescription:
+                definition.litDescription ??
+                definition.description ??
+                "",
+
+            initialState:
+
+                definition.initialState &&
+                typeof definition.initialState ===
+                    "object"
+
+                    ? {
+                        ...definition.initialState
+                    }
+
+                    : {},
+
+            light:
+
+                definition.light
+
+                    ? {
+                        ...definition.light
+                    }
+
+                    : null,
+
             spawn:
                 {
                     ...(
@@ -389,25 +424,36 @@ function getWorldObjectDefinition(
 
 function registerConfiguredWorldObjects() {
 
-    const configuredObjects =
+    const dataGroups = [
+
         window.NATURE_OBJECT_DATA ??
-        {};
+            {},
+
+        window.STRUCTURE_OBJECT_DATA ??
+            {}
+    ];
 
 
     for (
-        const [
-            objectId,
-            definition
-        ]
-        of Object.entries(
-            configuredObjects
-        )
+        const configuredObjects
+        of dataGroups
     ) {
 
-        registerWorldObjectDefinition(
-            objectId,
-            definition
-        );
+        for (
+            const [
+                objectId,
+                definition
+            ]
+            of Object.entries(
+                configuredObjects
+            )
+        ) {
+
+            registerWorldObjectDefinition(
+                objectId,
+                definition
+            );
+        }
     }
 }
 
@@ -934,6 +980,10 @@ function registerItem(
                 definition.toolType ??
                 null,
 
+            placeObjectType:
+                definition.placeObjectType ??
+                null,
+
             baseValue:
                 Math.max(
                     1,
@@ -1089,6 +1139,14 @@ function registerCraftingRecipe(
                 definition.category ??
                 "Misc",
 
+            station:
+                definition.station ??
+                null,
+
+            actionVerb:
+                definition.actionVerb ??
+                "craft",
+
             ingredients,
 
             output: {
@@ -1179,7 +1237,8 @@ function getCraftingRecipe(
 ========================================================= */
 
 function canPlayerCraftRecipe(
-    recipe
+    recipe,
+    station = null
 ) {
 
     if (!recipe) {
@@ -1187,6 +1246,13 @@ function canPlayerCraftRecipe(
         return false;
     }
 
+    if (
+        recipe.station !==
+        station
+    ) {
+
+        return false;
+    }
 
     if (
         !recipe.output ||
@@ -1238,7 +1304,9 @@ function canPlayerCraftRecipe(
 }
 
 
-function getCraftableRecipes() {
+function getCraftableRecipes(
+    station = null
+) {
 
     return Array.from(
         CRAFTING_RECIPES.values()
@@ -1247,7 +1315,8 @@ function getCraftableRecipes() {
         .filter(
             recipe =>
                 canPlayerCraftRecipe(
-                    recipe
+                    recipe,
+                    station
                 )
         )
 
@@ -1268,7 +1337,8 @@ function getCraftableRecipes() {
 ========================================================= */
 
 function craftRecipe(
-    recipeId
+    recipeId,
+    station = null
 ) {
 
     const recipe =
@@ -1280,7 +1350,8 @@ function craftRecipe(
     if (
         !recipe ||
         !canPlayerCraftRecipe(
-            recipe
+            recipe,
+            station
         )
     ) {
 
@@ -1412,7 +1483,9 @@ function craftRecipe(
 
     addLog(
 
-        `You craft ${
+        `You ${
+            recipe.actionVerb
+        } ${
             recipe.output.amount
         } ${
             outputItem.name
@@ -2210,6 +2283,125 @@ registerItemAction(
 
                 addLog(
                     `You unequip ${item.name}.`
+                );
+
+
+                return true;
+            }
+    }
+);
+
+/* =========================================================
+   PLACE ITEM
+========================================================= */
+
+registerItemAction(
+
+    "place",
+
+    {
+        label:
+            "Place",
+
+        minutes:
+            5,
+
+
+        isAvailable:
+            (
+                item,
+                context
+            ) => {
+
+                if (
+                    !item.placeObjectType ||
+                    context.amount <= 0
+                ) {
+
+                    return false;
+                }
+
+
+                return canPlaceWorldObjectAt(
+
+                    item.placeObjectType,
+
+                    player.x,
+                    player.y
+                );
+            },
+
+
+        execute:
+            (
+                item
+            ) => {
+
+                if (
+                    !item.placeObjectType
+                ) {
+
+                    return false;
+                }
+
+
+                /*
+                    Fjern først itemet.
+
+                    Hvis placement feiler,
+                    gis det tilbake.
+                */
+
+                if (
+                    !removeItemFromInventory(
+
+                        player,
+
+                        item.id,
+
+                        1
+                    )
+                ) {
+
+                    return false;
+                }
+
+
+                const object =
+                    createPlacedWorldObject(
+
+                        item.placeObjectType,
+
+                        player.x,
+                        player.y
+                    );
+
+
+                if (!object) {
+
+                    addItemToInventory(
+                        player,
+                        item.id,
+                        1
+                    );
+
+                    return false;
+                }
+
+
+                const definition =
+                    getWorldObjectDefinition(
+                        object.type
+                    );
+
+
+                addLog(
+
+                    `You place ${
+                        definition
+                            ? definition.name
+                            : item.name
+                    }.`
                 );
 
 
@@ -6922,6 +7114,164 @@ function getWorldObjectById(
 }
 
 /* =========================================================
+   PLACEABLE WORLD OBJECTS
+========================================================= */
+
+let placedWorldObjectCounter =
+    1;
+
+
+function canPlaceWorldObjectAt(
+    objectType,
+    x,
+    y
+) {
+
+    if (
+        !isInsideWorld(
+            x,
+            y
+        )
+    ) {
+
+        return false;
+    }
+
+
+    const definition =
+        getWorldObjectDefinition(
+            objectType
+        );
+
+
+    if (!definition) {
+
+        return false;
+    }
+
+
+    const tile =
+        getTile(
+            x,
+            y
+        );
+
+
+    if (!tile) {
+
+        return false;
+    }
+
+
+    /*
+        Må stå på normal walkable ground.
+    */
+
+    if (
+        tile.river ||
+        !TILES[
+            tile.type
+        ]?.walkable
+    ) {
+
+        return false;
+    }
+
+
+    /*
+        Ikke plasser oppå annet world object.
+    */
+
+    if (
+        getWorldObjectAt(
+            x,
+            y
+        )
+    ) {
+
+        return false;
+    }
+
+
+    /*
+        Ikke direkte på settlement marker.
+    */
+
+    if (
+        tile.settlementId !==
+        null
+    ) {
+
+        return false;
+    }
+
+
+    return true;
+}
+
+
+function createPlacedWorldObject(
+    objectType,
+    x,
+    y
+) {
+
+    const definition =
+        getWorldObjectDefinition(
+            objectType
+        );
+
+
+    if (
+        !definition ||
+        !canPlaceWorldObjectAt(
+            objectType,
+            x,
+            y
+        )
+    ) {
+
+        return null;
+    }
+
+
+    const object = {
+
+        id:
+            `placed_object_${placedWorldObjectCounter++}`,
+
+        type:
+            objectType,
+
+        x,
+        y,
+
+        depleted:
+            false,
+
+        regrowAtMinutes:
+            null,
+
+        state: {
+
+            ...definition.initialState
+        }
+    };
+
+
+    worldObjects.push(
+        object
+    );
+
+
+    window.worldObjects =
+        worldObjects;
+
+
+    return object;
+}
+
+/* =========================================================
    TERRAIN INTERACTION HELPERS
 ========================================================= */
 
@@ -7682,6 +8032,157 @@ function gatherWorldObject(
         `gather:${object.type}`,
 
         actionMinutes
+    );
+
+
+    return true;
+}
+
+/* =========================================================
+   CAMPFIRE
+========================================================= */
+
+function isCampfireLit(
+    object
+) {
+
+    return (
+        object?.state?.lit ===
+        true
+    );
+}
+
+
+function canLightCampfire(
+    object
+) {
+
+    if (!object) {
+
+        return false;
+    }
+
+
+    const definition =
+        getWorldObjectDefinition(
+            object.type
+        );
+
+
+    if (
+        !definition ||
+        definition.structureType !==
+            "campfire" ||
+        isCampfireLit(
+            object
+        )
+    ) {
+
+        return false;
+    }
+
+
+    const requiredItemId =
+        definition.light
+            ?.requiredItemId;
+
+
+    if (
+        requiredItemId &&
+        getItemAmount(
+            player,
+            requiredItemId
+        ) <= 0
+    ) {
+
+        return false;
+    }
+
+
+    return true;
+}
+
+
+function lightCampfire(
+    object
+) {
+
+    if (
+        !canLightCampfire(
+            object
+        )
+    ) {
+
+        return false;
+    }
+
+
+    const definition =
+        getWorldObjectDefinition(
+            object.type
+        );
+
+
+    object.state ??=
+        {};
+
+
+    object.state.lit =
+        true;
+
+
+    addLog(
+        "You light the campfire."
+    );
+
+
+    finishTurn(
+
+        "light:campfire",
+
+        Math.max(
+            1,
+
+            Number(
+                definition.light
+                    ?.minutes ??
+                2
+            )
+        )
+    );
+
+
+    return true;
+}
+
+
+function extinguishCampfire(
+    object
+) {
+
+    if (
+        !object ||
+        !isCampfireLit(
+            object
+        )
+    ) {
+
+        return false;
+    }
+
+
+    object.state.lit =
+        false;
+
+
+    addLog(
+        "You extinguish the campfire."
+    );
+
+
+    finishTurn(
+        "extinguish:campfire",
+        1
     );
 
 
@@ -8488,7 +8989,7 @@ function renderInteractionInspect() {
                 .toUpperCase();
 
 
-        const description =
+        let description =
 
             object.depleted
 
@@ -8499,11 +9000,171 @@ function renderInteractionInspect() {
                     .description;
 
 
+        if (
+            definition.structureType ===
+                "campfire" &&
+            isCampfireLit(
+                object
+            )
+        ) {
+
+            description =
+                definition.litDescription;
+        }
+
+
         let actionHTML =
             "";
 
-
         if (
+            definition.structureType ===
+            "campfire"
+        ) {
+
+            if (
+                !isCampfireLit(
+                    object
+                )
+            ) {
+
+                const requiredItemId =
+                    definition.light
+                        ?.requiredItemId;
+
+
+                const requiredItem =
+                    requiredItemId
+
+                        ? getItemDefinition(
+                            requiredItemId
+                        )
+
+                        : null;
+
+
+                const canLight =
+                    canLightCampfire(
+                        object
+                    );
+
+
+                actionHTML = `
+
+                    <div class="settlement-section">
+
+                        <div class="settlement-section-title">
+                            ACTIONS
+                        </div>
+
+                        <button
+                            type="button"
+                            class="settlement-action-button"
+                            data-interaction-action="light-campfire"
+                            ${
+                                canLight
+                                    ? ""
+                                    : "disabled"
+                            }
+                        >
+                            Light fire
+                        </button>
+
+
+                        ${
+                            !canLight
+
+                                ? `
+
+                                    <div class="settlement-list-detail">
+                                        Requires:
+                                        ${escapeHTML(
+                                            requiredItem
+                                                ? requiredItem.name
+                                                : definition.light
+                                                    ?.requiredItemLabel ??
+                                                "Fire Starter"
+                                        )}
+                                    </div>
+                                `
+
+                                : ""
+                        }
+
+                    </div>
+                `;
+
+            } else {
+
+                const cookingRecipes =
+                    getCraftableRecipes(
+                        "campfire"
+                    );
+
+
+                const cookingHTML =
+
+                    cookingRecipes.length > 0
+
+                        ? cookingRecipes.map(
+                            recipe => `
+
+                                <button
+                                    type="button"
+                                    class="settlement-action-button"
+                                    data-interaction-action="cook"
+                                    data-recipe-id="${escapeHTML(
+                                        recipe.id
+                                    )}"
+                                >
+                                    ${escapeHTML(
+                                        recipe.name
+                                    )}
+                                </button>
+                            `
+                        ).join("")
+
+                        : `
+
+                            <div class="settlement-list-detail">
+                                You have nothing available to cook.
+                            </div>
+                        `;
+
+
+                actionHTML = `
+
+                    <div class="settlement-section">
+
+                        <div class="settlement-section-title">
+                            COOKING
+                        </div>
+
+                        ${cookingHTML}
+
+                    </div>
+
+
+                    <div class="settlement-section">
+
+                        <div class="settlement-section-title">
+                            FIRE
+                        </div>
+
+                        <button
+                            type="button"
+                            class="settlement-action-button"
+                            data-interaction-action="extinguish-campfire"
+                        >
+                            Extinguish fire
+                        </button>
+
+                    </div>
+                `;
+            }
+        }
+
+
+        else if (
             !object.depleted &&
             definition.gather
         ) {
@@ -8604,11 +9265,26 @@ function renderInteractionInspect() {
 
                     <span>
                         ${
-                            object.depleted
+                            definition.structureType ===
+                            "campfire"
 
-                                ? "Depleted"
+                                ? (
+                                    isCampfireLit(
+                                        object
+                                    )
 
-                                : "Available"
+                                        ? "Lit"
+
+                                        : "Unlit"
+                                )
+
+                                : (
+                                    object.depleted
+
+                                        ? "Depleted"
+
+                                        : "Available"
+                                )
                         }
                     </span>
                 </div>
@@ -17754,6 +18430,30 @@ function isWalkable(x, y) {
         return false;
     }
 
+    const worldObject =
+        getWorldObjectAt(
+            x,
+            y
+        );
+
+
+    if (worldObject) {
+
+        const objectDefinition =
+            getWorldObjectDefinition(
+                worldObject.type
+            );
+
+
+        if (
+            objectDefinition
+                ?.blocksMovement ===
+            true
+        ) {
+
+            return false;
+        }
+    }
 
     const definition =
         TILES[
@@ -19250,6 +19950,29 @@ function updateUI() {
                 : "None";
     }
 
+    const equippedWeapon =
+        getEquippedItem(
+            "weapon"
+        );
+
+
+    const weaponValue =
+        document.getElementById(
+            "weapon-value"
+        );
+
+
+    if (weaponValue) {
+
+        weaponValue.textContent =
+
+            equippedWeapon
+
+                ? equippedWeapon.name
+
+                : "Fists";
+    }
+
     document.getElementById(
         "coins-value"
     ).textContent =
@@ -19911,6 +20634,128 @@ document.getElementById(
 
             interactionWindowState.targetId =
                 null;
+
+
+            renderInteractionWindow();
+
+
+            return;
+        }
+
+        /*
+            =====================================
+            LIGHT CAMPFIRE
+            =====================================
+        */
+
+        if (
+            action ===
+            "light-campfire"
+        ) {
+
+            const object =
+                getWorldObjectById(
+
+                    interactionWindowState
+                        .targetId
+                );
+
+
+            if (
+                lightCampfire(
+                    object
+                )
+            ) {
+
+                renderInteractionWindow();
+            }
+
+
+            return;
+        }
+
+
+        /*
+            =====================================
+            EXTINGUISH CAMPFIRE
+            =====================================
+        */
+
+        if (
+            action ===
+            "extinguish-campfire"
+        ) {
+
+            const object =
+                getWorldObjectById(
+
+                    interactionWindowState
+                        .targetId
+                );
+
+
+            if (
+                extinguishCampfire(
+                    object
+                )
+            ) {
+
+                renderInteractionWindow();
+            }
+
+
+            return;
+        }
+
+
+        /*
+            =====================================
+            COOK
+            =====================================
+        */
+
+        if (
+            action ===
+            "cook"
+        ) {
+
+            const object =
+                getWorldObjectById(
+
+                    interactionWindowState
+                        .targetId
+                );
+
+
+            if (
+                !object ||
+                !isCampfireLit(
+                    object
+                )
+            ) {
+
+                renderInteractionWindow();
+
+                return;
+            }
+
+
+            const success =
+                craftRecipe(
+
+                    button.dataset
+                        .recipeId,
+
+                    "campfire"
+                );
+
+
+            if (!success) {
+
+                renderInteractionWindow();
+
+                return;
+            }
 
 
             renderInteractionWindow();

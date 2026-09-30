@@ -104,6 +104,8 @@ window.NATURE_OBJECT_DATA = {
             biomes: [
                 "dry_grassland",
                 "cold_grassland",
+                "temperate_forest",
+                "coast",
                 "tundra",
                 "mountain",
                 "grassland"

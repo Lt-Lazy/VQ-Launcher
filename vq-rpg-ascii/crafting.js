@@ -330,6 +330,44 @@ window.CRAFTING_RECIPE_DATA = {
 
         minutes:
             5
+    },
+
+    cooked_meat: {
+
+        name:
+            "Cooked Meat",
+
+        category:
+            "Cooking",
+
+        station:
+            "campfire",
+
+        actionVerb:
+            "cook",
+
+        ingredients: [
+
+            {
+                itemId:
+                    "raw_meat",
+
+                amount:
+                    1
+            }
+        ],
+
+        output: {
+
+            itemId:
+                "cooked_meat",
+
+            amount:
+                1
+        },
+
+        minutes:
+            8
     }
 
 };

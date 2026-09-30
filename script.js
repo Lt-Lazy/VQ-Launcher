@@ -109,6 +109,21 @@ const news = [
     {
 
         date:
+            "30 SEP 2026",
+
+        game:
+            "VQ RPG",
+
+        title:
+            "Update Notes - civilization",
+
+        text:
+            "Added settlement generation. There can be family farms, towns, settlements and bigger cities. Added that every individual npc have a physical body. Before they were just stats, they still have families and relationships, but now a family have their own house, bigger towns have establishments for professions, like hunters, farms (with farm plots), markets with merchant and more. Npc's roam, stay at home, goes to work, children play and do not work. "
+    },
+
+    {
+
+        date:
             "29 SEP 2026",
 
         game:

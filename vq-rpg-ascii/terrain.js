@@ -197,7 +197,7 @@ window.TERRAIN_DATA = {
             true,
 
         inspectable:
-            true,
+            false,
 
         description:
             "Wet, soft ground covered by water-loving vegetation."
@@ -325,6 +325,69 @@ window.TERRAIN_DATA = {
         }
     },
 
+    settlementPath: {
+
+        name:
+            "Settlement Path",
+
+        char:
+            ":",
+
+        color:
+            "#9b845c",
+
+        walkable:
+            true,
+
+        inspectable:
+            false,
+
+        description:
+            "A worn dirt path linking the settlement together."
+    },
+
+    farmField: {
+
+        name:
+            "Cultivated Field",
+
+        char:
+            "=",
+
+        color:
+            "#b39a52",
+
+        walkable:
+            true,
+
+        inspectable:
+            true,
+
+        description:
+            "Rows of cultivated soil and crops belonging to the settlement."
+    },
+
+    houseFloor: {
+
+        name:
+            "Wooden Floor",
+
+        char:
+            ".",
+
+        color:
+            "#806b4e",
+
+        walkable:
+            true,
+
+        inspectable:
+            false,
+
+        description:
+            "Rough wooden floorboards inside a house."
+    },
+
 
     hill: {
 
@@ -341,7 +404,7 @@ window.TERRAIN_DATA = {
             true,
 
         inspectable:
-            true,
+            false,
 
         description:
             "Raised rocky ground overlooking the surrounding terrain."
@@ -363,7 +426,7 @@ window.TERRAIN_DATA = {
             false,
 
         inspectable:
-            true,
+            false,
 
         description:
             "Steep mountainous terrain that cannot currently be crossed."

@@ -25,7 +25,18 @@ const minimapCtx =
 const WORLD_WIDTH = 300;
 const WORLD_HEIGHT = 300;
 
-const WORLD_SEED = 912444442;
+const WORLD_SEED = 987654321;
+
+const WORLDGEN =
+    window.VQ_WORLDGEN;
+
+
+if (!WORLDGEN) {
+
+    throw new Error(
+        "worldgen.js must be loaded before script.js."
+    );
+}
 
 /* =========================================================
    WORLD GENERATION SETTINGS
@@ -42,6 +53,474 @@ const MOUNTAIN_LEVEL = 0.80;
 /* =========================================================
    SETTLEMENT GENERATION SETTINGS
 ========================================================= */
+
+/* =========================================================
+   INFINITE SETTLEMENT REGIONS
+========================================================= */
+
+/*
+    Civilization deles inn i større regions.
+
+    Hver region kan ha maksimum ett starting
+    settlement.
+
+    Dermed slipper vi å scanne hele den
+    infinite verdenen.
+*/
+
+const SETTLEMENT_REGION_SIZE =
+    160;
+
+
+const SETTLEMENT_REGION_MARGIN =
+    24;
+
+
+const SETTLEMENT_REGION_CHANCE =
+    0.78;
+
+
+const SETTLEMENT_CANDIDATES_PER_REGION =
+    32;
+
+
+const INFINITE_SETTLEMENT_MIN_SCORE =
+    0.46;
+
+/* =========================================================
+   INFINITE FACTION TERRITORIES
+========================================================= */
+
+const FACTION_TERRITORY_RULES = {
+
+    /*
+        Ett mulig faction-center per 3 x 3
+        settlement regions.
+
+        160 * 3 = 480 world tiles.
+    */
+
+    cellSize:
+        SETTLEMENT_REGION_SIZE * 3,
+
+    /*
+        Ikke alle områder trenger en stat/faction.
+        Dette gir også independent frontier areas.
+    */
+
+    spawnChance:
+        0.82,
+
+    /*
+        Faction center flyttes rundt inne i cellen,
+        slik at grensene ikke blir rette firkanter.
+    */
+
+    anchorMargin:
+        0.18,
+
+    /*
+        Settlements lenger unna enn dette blir
+        foreløpig independent.
+    */
+
+    maxClaimDistance:
+        SETTLEMENT_REGION_SIZE * 3.2
+};
+
+
+const FACTION_COLORS = [
+
+    "#d8b36a",
+    "#a7b86b",
+    "#7fa6b8",
+    "#b88974",
+    "#8fa27c",
+    "#b69ab0",
+    "#a89b72",
+    "#7f9f96"
+];
+
+/* =========================================================
+   CIVILIZATION SIMULATION RANGE
+========================================================= */
+
+const CIVILIZATION_SIMULATION_RULES = {
+
+    /*
+        Full person-data holdes loaded innenfor
+        denne radiusen.
+    */
+
+    detailedRadius:
+        SETTLEMENT_REGION_SIZE * 2,
+
+
+    /*
+        Bare settlements ganske nær spilleren
+        trenger fysiske NPC-er på world-gridet.
+    */
+
+    physicalNpcRadius:
+        90,
+
+
+    /*
+        Hvor ofte en NPC tar et tilfeldig
+        walking-step på dagtid.
+
+        Returning home ignorerer denne og
+        prøver å gå hvert game turn.
+    */
+
+    npcMoveChance:
+        0.55
+};
+
+/* =========================================================
+   PHYSICAL SETTLEMENT LAYOUT
+========================================================= */
+
+const SETTLEMENT_LAYOUT_RULES = {
+
+    /*
+        Første ordentlige house-type.
+
+        7 × 5 gir:
+        1-tile walls
+        5 × 3 interior
+    */
+
+    houseWidth:
+        7,
+
+    houseHeight:
+        5,
+
+
+    /*
+        Hvor langt settlementet kan spre
+        family houses fra sentrum.
+    */
+
+    layoutRadius:
+        26,
+
+
+    /*
+        Hold plass rundt H.
+
+        Her kan vi senere få market,
+        well, roads osv.
+    */
+
+    centerClearRadius:
+        3,
+
+
+    /*
+        Foretrukket tomrom mellom houses.
+    */
+
+    houseGap:
+        2,
+
+    pathSearchMargin:
+        12
+
+};
+
+/* =========================================================
+   SETTLEMENT DEVELOPMENT
+========================================================= */
+
+const SETTLEMENT_DEVELOPMENT_RULES = {
+
+    /*
+        Små homesteads / hamlets har ikke
+        automatisk en dedikert merchant.
+
+        Fra Village og oppover kan stedet
+        støtte en handelsmann.
+    */
+
+    merchantMinFamilies:
+        4,
+
+    /*
+        Starting size bestemmes separat fra
+        hvor mye fysisk plass settlementet har.
+
+        Dermed kan et stort, godt område fortsatt
+        starte som en liten homestead eller hamlet.
+    */
+
+    startingScales: [
+
+        /*
+            25% Homestead.
+        */
+
+        {
+            maxRoll:
+                0.25,
+
+            minFamilies:
+                1,
+
+            maxFamilies:
+                1
+        },
+
+
+        /*
+            30% Hamlet.
+        */
+
+        {
+            maxRoll:
+                0.55,
+
+            minFamilies:
+                2,
+
+            maxFamilies:
+                3
+        },
+
+
+        /*
+            28% Village.
+        */
+
+        {
+            maxRoll:
+                0.83,
+
+            minFamilies:
+                4,
+
+            maxFamilies:
+                8
+        },
+
+
+        /*
+            12% Town.
+        */
+
+        {
+            maxRoll:
+                0.95,
+
+            minFamilies:
+                9,
+
+            maxFamilies:
+                15
+        },
+
+
+        /*
+            5% City.
+        */
+
+        {
+            maxRoll:
+                1.00,
+
+            minFamilies:
+                16,
+
+            maxFamilies:
+                24
+        }
+    ],
+
+    /*
+        Settlement type bestemmes av antall
+        levende familier.
+
+        Dette gjør at settlementet beskrives
+        etter hva det faktisk har blitt,
+        ikke etter et tilfeldig population target.
+    */
+
+    types: [
+
+        {
+            minFamilies:
+                16,
+
+            name:
+                "City"
+        },
+
+        {
+            minFamilies:
+                9,
+
+            name:
+                "Town"
+        },
+
+        {
+            minFamilies:
+                4,
+
+            name:
+                "Village"
+        },
+
+        {
+            minFamilies:
+                2,
+
+            name:
+                "Hamlet"
+        },
+
+        {
+            minFamilies:
+                1,
+
+            name:
+                "Homestead"
+        }
+    ]
+};
+
+/* =========================================================
+   SETTLEMENT TYPE
+========================================================= */
+
+function getSettlementType(
+    settlement
+) {
+
+    if (!settlement) {
+
+        return "Unknown";
+    }
+
+
+    const familyCount =
+
+        getLivingSettlementFamilies(
+            settlement
+        ).length;
+
+
+    /*
+        Ingen levende familier igjen.
+
+        Nyttig senere dersom settlements
+        faktisk kan dø ut.
+    */
+
+    if (
+        familyCount === 0
+    ) {
+
+        return "Abandoned";
+    }
+
+
+    for (
+        const type
+        of SETTLEMENT_DEVELOPMENT_RULES.types
+    ) {
+
+        if (
+            familyCount >=
+            type.minFamilies
+        ) {
+
+            return type.name;
+        }
+    }
+
+
+    /*
+        Safety fallback.
+    */
+
+    return "Homestead";
+}
+
+/* =========================================================
+   SETTLEMENT WORKPLACE TYPES
+========================================================= */
+
+const SETTLEMENT_WORKPLACE_TYPES = {
+
+    merchant: {
+        name: "Market Shop",
+        signChar: "$"
+    },
+
+    farmer: {
+        name: "Farmstead",
+        signChar: "F"
+    },
+
+    forager: {
+        name: "Forager Hut",
+        signChar: "G"
+    },
+
+    hunter: {
+        name: "Hunter Lodge",
+        signChar: "H"
+    },
+
+    lumberjack: {
+        name: "Lumber Yard",
+        signChar: "L"
+    },
+
+    stonecutter: {
+        name: "Stone Yard",
+        signChar: "S"
+    },
+
+    miner: {
+        name: "Mine House",
+        signChar: "M"
+    }
+};
+
+/* =========================================================
+   PHYSICAL FARM SETTINGS
+========================================================= */
+
+const SETTLEMENT_FARM_RULES = {
+
+    /*
+        Vi prøver stor field først.
+
+        Hvis terrain/buildings ikke gir plass,
+        prøver vi mindre størrelser.
+    */
+
+    fieldSizes: [
+
+        { width: 11, height: 7 },
+
+        { width: 9, height: 7 },
+
+        { width: 7, height: 5 }
+    ],
+
+
+    /*
+        0 betyr at field starter rett utenfor
+        rear door på Farmstead.
+    */
+
+    buildingGap:
+        0
+};
 
 const MIN_STARTING_SETTLEMENTS = 7;
 const MAX_STARTING_SETTLEMENTS = 12;
@@ -276,6 +755,168 @@ let world = [];
 let worldObjects =
     [];
 
+/*
+    Chunks som for øyeblikket har fått
+    gameplay-content generert.
+
+    Terrain-cache ligger i worldgen.js.
+    Dette gjelder natural objects og creatures.
+*/
+
+const loadedContentChunkKeys =
+    new Set();
+
+const generatedSettlementRegionKeys =
+    new Set();
+
+/*
+    Creature-count i creatures.js ble opprinnelig
+    balansert for den gamle 300 x 300 verdenen.
+
+    Vi bruker derfor dette som reference area når
+    count konverteres til en per-tile density.
+*/
+
+const CREATURE_REFERENCE_AREA =
+    300 * 300;
+
+/* =========================================================
+   PERSISTENT WORLD CHANGES
+========================================================= */
+
+/*
+    Vi lagrer bare forskjellen mellom den
+    deterministiske grunnverdenen og verdenen
+    spilleren faktisk har endret.
+*/
+
+const terrainOverrides =
+    new Map();
+
+
+const naturalObjectStates =
+    new Map();
+
+
+const wildCreatureStates =
+    new Map();
+
+
+/*
+    Player-placed objects og carcasses.
+
+    Map:
+        chunkKey -> Map(objectId -> object snapshot)
+*/
+
+const persistentObjectsByChunk =
+    new Map();
+
+
+function getWorldPositionKey(
+    x,
+    y
+) {
+
+    return `${x},${y}`;
+}
+
+
+/* =========================================================
+   TERRAIN PERSISTENCE
+========================================================= */
+
+function setTerrainOverride(
+    x,
+    y,
+    changes
+) {
+
+    const key =
+        getWorldPositionKey(
+            x,
+            y
+        );
+
+
+    const previous =
+        terrainOverrides.get(
+            key
+        ) ??
+        {};
+
+
+    const next = {
+
+        ...previous,
+        ...changes
+    };
+
+
+    terrainOverrides.set(
+        key,
+        next
+    );
+
+
+    /*
+        Endre også tile som akkurat nå
+        ligger i chunk-cachen.
+    */
+
+    const tile =
+        WORLDGEN.getTile(
+            x,
+            y,
+            WORLD_SEED
+        );
+
+
+    if (tile) {
+
+        Object.assign(
+            tile,
+            next
+        );
+    }
+}
+
+
+function applyTerrainOverride(
+    tile
+) {
+
+    if (!tile) {
+
+        return null;
+    }
+
+
+    const key =
+        getWorldPositionKey(
+            tile.x,
+            tile.y
+        );
+
+
+    const changes =
+        terrainOverrides.get(
+            key
+        );
+
+
+    if (changes) {
+
+        Object.assign(
+            tile,
+            changes
+        );
+    }
+
+
+    return tile;
+}
+
 
 const WORLD_OBJECT_DEFINITIONS =
     new Map();
@@ -396,14 +1037,37 @@ function registerWorldObjectDefinition(
                             : []
                 },
 
-            gather:
-                definition.gather
+                gather:
+                    definition.gather
 
-                    ? {
-                        ...definition.gather
-                    }
+                        ? {
+                            ...definition.gather
+                        }
 
-                    : null
+                        : null,
+
+                butcher:
+                    definition.butcher
+
+                        ? {
+                            ...definition.butcher,
+
+                            outputs:
+
+                                Array.isArray(
+                                    definition.butcher.outputs
+                                )
+
+                                    ? definition.butcher.outputs.map(
+                                        output => ({
+                                            ...output
+                                        })
+                                    )
+
+                                    : []
+                        }
+
+                        : null
         }
     );
 }
@@ -430,6 +1094,9 @@ function registerConfiguredWorldObjects() {
             {},
 
         window.STRUCTURE_OBJECT_DATA ??
+            {},
+
+        window.CREATURE_OBJECT_DATA ??
             {}
     ];
 
@@ -582,8 +1249,8 @@ const player = {
 
     name: "Erik",
 
-    x: Math.floor(WORLD_WIDTH / 2),
-    y: Math.floor(WORLD_HEIGHT / 2),
+    x: 0,
+    y: 0,
 
     char: "@",
     color: "#ffffff",
@@ -615,7 +1282,187 @@ const player = {
    CREATURES
 ========================================================= */
 
-let creatures = [];
+let creatures =
+    [];
+
+
+const CREATURE_DEFINITIONS =
+    new Map();
+
+
+function registerCreatureDefinition(
+    creatureId,
+    definition = {}
+) {
+
+    CREATURE_DEFINITIONS.set(
+
+        creatureId,
+
+        {
+            id:
+                creatureId,
+
+            name:
+                definition.name ??
+                creatureId,
+
+            description:
+                definition.description ??
+                "",
+
+            char:
+                definition.char ??
+                "?",
+
+            color:
+                definition.color ??
+                "#ffffff",
+
+            maxHp:
+
+                Math.max(
+                    1,
+
+                    Math.floor(
+                        Number(
+                            definition.maxHp ??
+                            1
+                        )
+                    )
+                ),
+
+            behavior:
+                definition.behavior ??
+                "passive",
+
+            carcassType:
+                definition.carcassType ??
+                null,
+
+            detectionRange:
+
+                Math.max(
+                    0,
+
+                    Math.floor(
+                        Number(
+                            definition.detectionRange ??
+                            0
+                        )
+                    )
+                ),
+
+            moveChance:
+
+                Math.max(
+                    0,
+
+                    Math.min(
+                        1,
+
+                        Number(
+                            definition.moveChance ??
+                            1
+                        )
+                    )
+                ),
+
+            spawn: {
+
+                ...(
+                    definition.spawn ??
+                    {}
+                ),
+
+                count:
+
+                    Math.max(
+                        0,
+
+                        Math.floor(
+                            Number(
+                                definition.spawn
+                                    ?.count ??
+                                0
+                            )
+                        )
+                    ),
+
+                biomes:
+
+                    Array.isArray(
+                        definition.spawn
+                            ?.biomes
+                    )
+
+                        ? [
+                            ...definition
+                                .spawn
+                                .biomes
+                        ]
+
+                        : [],
+
+                tileTypes:
+
+                    Array.isArray(
+                        definition.spawn
+                            ?.tileTypes
+                    )
+
+                        ? [
+                            ...definition
+                                .spawn
+                                .tileTypes
+                        ]
+
+                        : []
+            }
+        }
+    );
+}
+
+
+function registerConfiguredCreatures() {
+
+    const configuredCreatures =
+        window.CREATURE_DATA ??
+        {};
+
+
+    for (
+        const [
+            creatureId,
+            definition
+        ]
+        of Object.entries(
+            configuredCreatures
+        )
+    ) {
+
+        registerCreatureDefinition(
+            creatureId,
+            definition
+        );
+    }
+}
+
+
+registerConfiguredCreatures();
+
+
+function getCreatureDefinition(
+    creatureType
+) {
+
+    return (
+        CREATURE_DEFINITIONS.get(
+            creatureType
+        ) ||
+        null
+    );
+}
 
 
 /* =========================================================
@@ -979,6 +1826,17 @@ function registerItem(
             toolType:
                 definition.toolType ??
                 null,
+
+            damage:
+
+                Math.max(
+                    0,
+
+                    Number(
+                        definition.damage ??
+                        0
+                    )
+                ),
 
             placeObjectType:
                 definition.placeObjectType ??
@@ -1863,12 +2721,33 @@ function hasEquippedToolType(
         );
 
 
-    return (
-
-        tool !== null &&
+    if (
+        tool &&
         tool.toolType ===
             toolType
-    );
+    ) {
+
+        return true;
+    }
+
+
+    const weapon =
+        getEquippedItem(
+            "weapon"
+        );
+
+
+    if (
+        weapon &&
+        weapon.toolType ===
+            toolType
+    ) {
+
+        return true;
+    }
+
+
+    return false;
 }
 
 /* =========================================================
@@ -4388,6 +5267,18 @@ function simulateSettlementProductionDay() {
         of settlements
     ) {
 
+        if (
+            settlement.populationLoaded ===
+                false ||
+
+            !isSettlementDetailedSimulationActive(
+                settlement
+            )
+        ) {
+
+            continue;
+        }
+
         /*
             Fyll jobber som har blitt ledige
             etter death / coming of age osv.
@@ -5253,6 +6144,10 @@ function renderSettlementOverview() {
             settlement
         );
 
+    const settlementType =
+        getSettlementType(
+            settlement
+        );
 
     const notableResidents =
         getNotableResidents(
@@ -5375,6 +6270,28 @@ function renderSettlementOverview() {
         </div>
 
         ${
+            faction
+
+                ? `
+                    <div class="settlement-row">
+                        <span>Faction settlements</span>
+                        <span>
+                            ${faction.settlementIds.length}
+                        </span>
+                    </div>
+
+                    <div class="settlement-row">
+                        <span>Faction population</span>
+                        <span>
+                            ${faction.population}
+                        </span>
+                    </div>
+                `
+
+                : ""
+        }
+
+        ${
             isCapital
                 ? `
                     <div class="settlement-row">
@@ -5386,6 +6303,15 @@ function renderSettlementOverview() {
         }
 
         <div class="settlement-row">
+            <span>Type</span>
+            <span>
+                ${escapeHTML(
+                    settlementType
+                )}
+            </span>
+        </div>
+
+        <div class="settlement-row">
             <span>Population</span>
             <span>${residents.length}</span>
         </div>
@@ -5393,6 +6319,28 @@ function renderSettlementOverview() {
         <div class="settlement-row">
             <span>Families</span>
             <span>${livingFamilies.length}</span>
+        </div>
+
+        <div class="settlement-row">
+            <span>Homes</span>
+            <span>
+                ${
+                    settlement.housePlacements
+                        ?.length ??
+                    0
+                }
+            </span>
+        </div>
+
+        <div class="settlement-row">
+            <span>Workplaces</span>
+            <span>
+                ${
+                    settlement.workplacePlacements
+                        ?.length ??
+                    0
+                }
+            </span>
         </div>
 
         <div class="settlement-row">
@@ -6298,6 +7246,28 @@ function renderSettlementPerson() {
                 </span>
             </div>
 
+            ${
+                faction
+
+                    ? `
+                        <div class="settlement-row">
+                            <span>Faction settlements</span>
+                            <span>
+                                ${faction.settlementIds.length}
+                            </span>
+                        </div>
+
+                        <div class="settlement-row">
+                            <span>Faction population</span>
+                            <span>
+                                ${faction.population}
+                            </span>
+                        </div>
+                    `
+
+                    : ""
+            }
+
             <div class="settlement-row">
                 <span>Family</span>
                 <span>
@@ -7067,6 +8037,23 @@ function refreshWorldObjectState(
 
     object.regrowAtMinutes =
         null;
+
+    saveNaturalObjectState(
+
+        object,
+
+        {
+            removed:
+                false,
+
+            depleted:
+                false,
+
+            regrowAtMinutes:
+                null
+        }
+    );
+    
 }
 
 
@@ -7111,6 +8098,218 @@ function getWorldObjectById(
 
         null
     );
+}
+
+/* =========================================================
+   PLACED OBJECT PERSISTENCE
+========================================================= */
+
+function getPersistentObjectStore(
+    chunkKey,
+    create = false
+) {
+
+    let store =
+        persistentObjectsByChunk.get(
+            chunkKey
+        );
+
+
+    if (
+        !store &&
+        create
+    ) {
+
+        store =
+            new Map();
+
+
+        persistentObjectsByChunk.set(
+            chunkKey,
+            store
+        );
+    }
+
+
+    return store ??
+        null;
+}
+
+
+function savePersistentWorldObject(
+    object
+) {
+
+    if (!object) {
+
+        return;
+    }
+
+
+    const chunkKey =
+
+        object.persistentChunkKey ??
+
+        getWorldChunkKeyAt(
+            object.x,
+            object.y
+        );
+
+
+    object.persistentChunkKey =
+        chunkKey;
+
+
+    const store =
+        getPersistentObjectStore(
+            chunkKey,
+            true
+        );
+
+
+    store.set(
+
+        object.id,
+
+        {
+            id:
+                object.id,
+
+            type:
+                object.type,
+
+            x:
+                object.x,
+
+            y:
+                object.y,
+
+            depleted:
+                object.depleted ===
+                true,
+
+            regrowAtMinutes:
+
+                object.regrowAtMinutes ??
+                null,
+
+            state: {
+
+                ...(
+                    object.state ??
+                    {}
+                )
+            },
+
+            persistentChunkKey:
+                chunkKey
+        }
+    );
+}
+
+
+function removePersistentWorldObject(
+    object
+) {
+
+    if (!object) {
+
+        return;
+    }
+
+
+    const chunkKey =
+
+        object.persistentChunkKey ??
+
+        getWorldChunkKeyAt(
+            object.x,
+            object.y
+        );
+
+
+    const store =
+        getPersistentObjectStore(
+            chunkKey
+        );
+
+
+    if (!store) {
+
+        return;
+    }
+
+
+    store.delete(
+        object.id
+    );
+
+
+    if (
+        store.size === 0
+    ) {
+
+        persistentObjectsByChunk.delete(
+            chunkKey
+        );
+    }
+}
+
+
+function restorePersistentObjectsForChunk(
+    chunkX,
+    chunkY
+) {
+
+    const chunkKey =
+        WORLDGEN.getChunkKey(
+            chunkX,
+            chunkY
+        );
+
+
+    const store =
+        getPersistentObjectStore(
+            chunkKey
+        );
+
+
+    if (!store) {
+
+        return;
+    }
+
+
+    for (
+        const saved
+        of store.values()
+    ) {
+
+        if (
+            worldObjects.some(
+                object =>
+                    object.id ===
+                    saved.id
+            )
+        ) {
+
+            continue;
+        }
+
+
+        worldObjects.push({
+
+            ...saved,
+
+            state: {
+
+                ...(
+                    saved.state ??
+                    {}
+                )
+            }
+        });
+    }
 }
 
 /* =========================================================
@@ -7263,6 +8462,9 @@ function createPlacedWorldObject(
         object
     );
 
+    savePersistentWorldObject(
+        object
+    );
 
     window.worldObjects =
         worldObjects;
@@ -7777,8 +8979,16 @@ function performTerrainAction(
         Endre selve verdenen.
     */
 
-    terrain.tile.type =
-        replacementType;
+    setTerrainOverride(
+
+        coordinates.x,
+        coordinates.y,
+
+        {
+            type:
+                replacementType
+        }
+    );
 
 
     const actionMinutes =
@@ -7835,6 +9045,91 @@ const WORLD_OBJECT_INTERACTION_OFFSETS = [
     { x: -1, y:  1 }
 ];
 
+/* =========================================================
+   NATURAL OBJECT PERSISTENCE
+========================================================= */
+
+function getNaturalObjectState(
+    objectId
+) {
+
+    const state =
+        naturalObjectStates.get(
+            objectId
+        );
+
+
+    if (!state) {
+
+        return null;
+    }
+
+
+    /*
+        Object kan ha regrown mens chunken
+        ikke var loaded.
+    */
+
+    if (
+        state.depleted === true &&
+        state.regrowAtMinutes !== null &&
+        worldTime.totalMinutes >=
+            state.regrowAtMinutes
+    ) {
+
+        state.depleted =
+            false;
+
+        state.regrowAtMinutes =
+            null;
+
+
+        naturalObjectStates.set(
+            objectId,
+            state
+        );
+    }
+
+
+    return state;
+}
+
+
+function saveNaturalObjectState(
+    object,
+    changes = {}
+) {
+
+    if (
+        !object ||
+        !String(
+            object.id
+        ).startsWith(
+            "natural_"
+        )
+    ) {
+
+        return;
+    }
+
+
+    const previous =
+        naturalObjectStates.get(
+            object.id
+        ) ??
+        {};
+
+
+    naturalObjectStates.set(
+
+        object.id,
+
+        {
+            ...previous,
+            ...changes
+        }
+    );
+}
 
 /* =========================================================
    GATHER NATURAL OBJECT
@@ -7971,9 +9266,20 @@ function gatherWorldObject(
     */
 
     if (
+        
         gather.removeAfterGather ===
         true
     ) {
+
+        saveNaturalObjectState(
+
+            object,
+
+            {
+                removed:
+                    true
+            }
+        );
 
         const index =
             worldObjects.indexOf(
@@ -8009,7 +9315,6 @@ function gatherWorldObject(
         object.depleted =
             true;
 
-
         object.regrowAtMinutes =
 
             worldTime.totalMinutes +
@@ -8019,6 +9324,23 @@ function gatherWorldObject(
             Number(
                 gather.regrowMinutes
             );
+
+        saveNaturalObjectState(
+
+            object,
+
+            {
+                removed:
+                    false,
+
+                depleted:
+                    true,
+
+                regrowAtMinutes:
+                    object.regrowAtMinutes
+            }
+        );
+
     }
 
 
@@ -8032,6 +9354,213 @@ function gatherWorldObject(
         `gather:${object.type}`,
 
         actionMinutes
+    );
+
+
+    return true;
+}
+
+/* =========================================================
+   BUTCHER WORLD OBJECT
+========================================================= */
+
+function butcherWorldObject(
+    object
+) {
+
+    if (!object) {
+
+        return false;
+    }
+
+
+    const definition =
+        getWorldObjectDefinition(
+            object.type
+        );
+
+
+    if (
+        !definition ||
+        !definition.butcher
+    ) {
+
+        return false;
+    }
+
+
+    const butcher =
+        definition.butcher;
+
+
+    /*
+        Tool requirement.
+    */
+
+    if (
+        butcher.requiredToolType &&
+        !hasEquippedToolType(
+            butcher.requiredToolType
+        )
+    ) {
+
+        addLog(
+
+            `You need an equipped ${
+                butcher.requiredToolLabel ??
+                butcher.requiredToolType
+            } to butcher this carcass.`
+        );
+
+        return false;
+    }
+
+
+    const gatheredItems =
+        [];
+
+
+    for (
+        const output
+        of butcher.outputs
+    ) {
+
+        const item =
+            getItemDefinition(
+                output.itemId
+            );
+
+
+        if (!item) {
+
+            continue;
+        }
+
+
+        const minimum =
+
+            Math.max(
+                1,
+
+                Math.floor(
+                    Number(
+                        output.minAmount ??
+                        1
+                    )
+                )
+            );
+
+
+        const maximum =
+
+            Math.max(
+
+                minimum,
+
+                Math.floor(
+                    Number(
+                        output.maxAmount ??
+                        minimum
+                    )
+                )
+            );
+
+
+        const amount =
+            randomInteger(
+
+                simulationRandom,
+
+                minimum,
+                maximum
+            );
+
+
+        if (
+            addItemToInventory(
+
+                player,
+
+                item.id,
+
+                amount
+            )
+        ) {
+
+            gatheredItems.push({
+
+                item,
+                amount
+            });
+        }
+    }
+
+
+    if (
+        gatheredItems.length === 0
+    ) {
+
+        return false;
+    }
+
+
+    /*
+        Carcass fjernes etter butchering.
+    */
+
+    removePersistentWorldObject(
+        object
+    );
+
+    const objectIndex =
+        worldObjects.indexOf(
+            object
+        );
+
+
+    if (
+        objectIndex >= 0
+    ) {
+
+        worldObjects.splice(
+            objectIndex,
+            1
+        );
+    }
+
+
+    const lootText =
+        gatheredItems
+
+            .map(
+                entry =>
+
+                    `${entry.amount} ${entry.item.name}`
+            )
+
+            .join(", ");
+
+
+    addLog(
+
+        `You butcher the ${definition.name.toLowerCase()} and collect ${lootText}.`
+    );
+
+
+    finishTurn(
+
+        "butcher",
+
+        Math.max(
+            1,
+
+            Math.floor(
+                Number(
+                    butcher.minutes ??
+                    1
+                )
+            )
+        )
     );
 
 
@@ -8130,6 +9659,9 @@ function lightCampfire(
     object.state.lit =
         true;
 
+    savePersistentWorldObject(
+        object
+    );
 
     addLog(
         "You light the campfire."
@@ -8174,6 +9706,9 @@ function extinguishCampfire(
     object.state.lit =
         false;
 
+    savePersistentWorldObject(
+        object
+    );
 
     addLog(
         "You extinguish the campfire."
@@ -8452,13 +9987,18 @@ function getNearbyInteractionTargets() {
 
             char:
 
-                object.depleted
+                object.state
+                    ?.renderChar ??
 
-                    ? definition
-                        .depletedChar
+                (
+                    object.depleted
 
-                    : definition
-                        .char,
+                        ? definition
+                            .depletedChar
+
+                        : definition
+                            .char
+                ),
 
             x:
                 object.x,
@@ -8481,6 +10021,188 @@ function getNearbyInteractionTargets() {
         });
     }
 
+    /* =========================================
+    CREATURES
+    ========================================= */
+
+    for (
+        const offset
+        of WORLD_OBJECT_INTERACTION_OFFSETS
+    ) {
+
+        /*
+            Creature kan ikke stå på samme tile
+            som player.
+        */
+
+        if (
+            offset.x === 0 &&
+            offset.y === 0
+        ) {
+
+            continue;
+        }
+
+
+        const x =
+            player.x +
+            offset.x;
+
+        const y =
+            player.y +
+            offset.y;
+
+
+        const creature =
+            getCreatureAt(
+                x,
+                y
+            );
+
+
+        if (!creature) {
+
+            continue;
+        }
+
+
+        targets.push({
+
+            targetType:
+                "creature",
+
+            targetId:
+                creature.id,
+
+            name:
+                creature.name,
+
+            char:
+                creature.char,
+
+            x:
+                creature.x,
+
+            y:
+                creature.y,
+
+            isHere:
+                false,
+
+            detail:
+
+                `${getInteractionDirectionLabel(
+                    creature.x,
+                    creature.y
+                )} — Creature`
+        });
+    }
+
+    /* =========================================
+    PEOPLE
+    ========================================= */
+
+    for (
+        const offset
+        of WORLD_OBJECT_INTERACTION_OFFSETS
+    ) {
+
+        const x =
+            player.x +
+            offset.x;
+
+        const y =
+            player.y +
+            offset.y;
+
+
+        /*
+            Flere NPC-er kan nå dele samme tile.
+
+            Derfor henter vi ALLE personer på
+            posisjonen, ikke bare den første.
+        */
+
+        const persons =
+            getPhysicalPeopleAt(
+                x,
+                y
+            );
+
+
+        if (
+            persons.length ===
+            0
+        ) {
+
+            continue;
+        }
+
+
+        const isHere =
+
+            offset.x === 0 &&
+            offset.y === 0;
+
+
+        for (
+            const person
+            of persons
+        ) {
+
+            const professionLabel =
+
+                person.profession
+
+                    ? formatWorldLabel(
+                        person.profession
+                    )
+
+                    : formatWorldLabel(
+                        getPersonLifeStage(
+                            person
+                        )
+                    );
+
+
+            targets.push({
+
+                targetType:
+                    "person",
+
+                targetId:
+                    person.id,
+
+                name:
+                    person.name,
+
+                char:
+                    person.char ??
+                    "p",
+
+                x:
+                    person.worldX,
+
+                y:
+                    person.worldY,
+
+                isHere,
+
+                detail:
+
+                    `${
+                        isHere
+
+                            ? "Here"
+
+                            : getInteractionDirectionLabel(
+                                person.worldX,
+                                person.worldY
+                            )
+                    } — ${professionLabel}`
+            });
+        }
+    }
 
     /* =========================================
        NEARBY TERRAIN
@@ -8930,6 +10652,324 @@ function renderInteractionInspect() {
             "interaction-window-content"
         );
 
+    /*
+        =========================================
+        PERSON
+        =========================================
+    */
+
+    if (
+        targetType ===
+        "person"
+    ) {
+
+        const person =
+            getPersonById(
+                targetId
+            );
+
+
+        if (
+            !person ||
+            !person.alive ||
+            person.physicalInitialized !==
+                true
+        ) {
+
+            interactionWindowState.view =
+                "list";
+
+            renderInteractionWindow();
+
+            return;
+        }
+
+
+        const settlement =
+            getSettlementById(
+                person.settlementId
+            );
+
+
+        const professionLabel =
+
+            person.profession
+
+                ? formatWorldLabel(
+                    person.profession
+                )
+
+                : "None";
+
+
+        document.getElementById(
+            "interaction-window-title"
+        ).textContent =
+
+            person.name
+                .toUpperCase();
+
+
+        content.innerHTML = `
+
+            <button
+                type="button"
+                class="settlement-back-button"
+                data-interaction-action="back"
+            >
+                &lt; Back
+            </button>
+
+
+            <div class="settlement-section">
+
+                <div class="settlement-row">
+                    <span>Symbol</span>
+                    <span>
+                        ${escapeHTML(
+                            person.char ?? "p"
+                        )}
+                    </span>
+                </div>
+
+
+                <div class="settlement-row">
+                    <span>Age</span>
+                    <span>
+                        ${getPersonAge(
+                            person
+                        )}
+                    </span>
+                </div>
+
+
+                <div class="settlement-row">
+                    <span>Profession</span>
+                    <span>
+                        ${escapeHTML(
+                            professionLabel
+                        )}
+                    </span>
+                </div>
+
+
+                <div class="settlement-row">
+                    <span>Settlement</span>
+                    <span>
+                        ${
+                            settlement
+
+                                ? escapeHTML(
+                                    settlement.name
+                                )
+
+                                : "Unknown"
+                        }
+                    </span>
+                </div>
+
+            </div>
+
+
+            <div class="settlement-section">
+
+                <div class="settlement-section-title">
+                    ACTIONS
+                </div>
+
+                <button
+                    type="button"
+                    class="settlement-action-button"
+                    data-interaction-action="open-person"
+                >
+                    Interact
+                </button>
+
+            </div>
+        `;
+
+
+        return;
+    }
+
+    /*
+        =========================================
+        CREATURE
+        =========================================
+    */
+
+    if (
+        targetType ===
+        "creature"
+    ) {
+
+        const creature =
+            getCreatureById(
+                targetId
+            );
+
+
+        if (
+            !creature ||
+            !creature.alive
+        ) {
+
+            interactionWindowState.view =
+                "list";
+
+            renderInteractionWindow();
+
+            return;
+        }
+
+
+        const definition =
+            getCreatureDefinition(
+                creature.type
+            );
+
+
+        if (!definition) {
+
+            interactionWindowState.view =
+                "list";
+
+            renderInteractionWindow();
+
+            return;
+        }
+
+
+        document.getElementById(
+            "interaction-window-title"
+        ).textContent =
+
+            creature.name
+                .toUpperCase();
+
+
+        const behaviorLabel =
+
+            creature.behavior ===
+                "flee"
+
+                ? "Flees from danger"
+
+                : creature.behavior ===
+                    "hostile"
+
+                    ? "Hostile"
+
+                    : "Passive";
+
+
+        const attackAvailable =
+            canPlayerAttackCreature(
+                creature
+            );
+
+
+        content.innerHTML = `
+
+            <button
+                type="button"
+                class="settlement-back-button"
+                data-interaction-action="back"
+            >
+                &lt; Back
+            </button>
+
+
+            <div class="settlement-section">
+
+                <div class="settlement-row">
+                    <span>Symbol</span>
+
+                    <span>
+                        ${escapeHTML(
+                            creature.char
+                        )}
+                    </span>
+                </div>
+
+
+                <div class="settlement-row">
+                    <span>Location</span>
+
+                    <span>
+                        ${escapeHTML(
+                            getInteractionDirectionLabel(
+                                creature.x,
+                                creature.y
+                            )
+                        )}
+                    </span>
+                </div>
+
+
+                <div class="settlement-row">
+                    <span>Health</span>
+
+                    <span>
+                        ${creature.hp}/${creature.maxHp}
+                    </span>
+                </div>
+
+
+                <div class="settlement-row">
+                    <span>Behavior</span>
+
+                    <span>
+                        ${escapeHTML(
+                            behaviorLabel
+                        )}
+                    </span>
+                </div>
+
+            </div>
+
+
+            <div class="settlement-section">
+
+                <div class="settlement-section-title">
+                    INSPECT
+                </div>
+
+                <div>
+                    ${escapeHTML(
+                        definition.description
+                    )}
+                </div>
+
+            </div>
+
+
+            <div class="settlement-section">
+
+                <div class="settlement-section-title">
+                    ACTIONS
+                </div>
+
+                <button
+                    type="button"
+                    class="settlement-action-button"
+                    data-interaction-action="attack-creature"
+                    ${
+                        attackAvailable
+                            ? ""
+                            : "disabled"
+                    }
+                >
+                    Attack
+                </button>
+
+            </div>
+        `;
+
+
+        return;
+    }
+
 
     /*
         =========================================
@@ -8998,6 +11038,147 @@ function renderInteractionInspect() {
 
                 : definition
                     .description;
+
+        /*
+            Family house får en dynamisk description.
+        */
+
+            const isFamilyHousePart =
+
+                definition.structureType ===
+                    "family_house_wall" ||
+
+                definition.structureType ===
+                    "family_house_door";
+
+
+            if (isFamilyHousePart) {
+
+                const settlement =
+
+                    getSettlementById(
+
+                        object.state
+                            ?.settlementId
+                    );
+
+
+                const family =
+
+                    settlement
+
+                        ? getSettlementFamilyRecord(
+
+                            settlement,
+
+                            object.state
+                                ?.familyId
+                        )
+
+                        : null;
+
+
+                const partName =
+
+                    definition.structureType ===
+                        "family_house_door"
+
+                        ? "Entrance"
+
+                        : "Wall";
+
+
+                if (
+                    settlement &&
+                    family
+                ) {
+
+                    description =
+
+                        `${partName} of the ${family.surname} family home in ${settlement.name}.`;
+
+                } else if (settlement) {
+
+                    description =
+
+                        `${partName} of a family home in ${settlement.name}.`;
+                }
+            }
+
+        const isWorkplacePart =
+
+            definition.structureType ===
+                "settlement_workplace_wall" ||
+
+            definition.structureType ===
+                "settlement_workplace_door" ||
+
+            definition.structureType ===
+                "settlement_workplace_sign";
+
+
+        if (isWorkplacePart) {
+
+            const settlement =
+
+                getSettlementById(
+
+                    object.state
+                        ?.settlementId
+                );
+
+
+            const workplaceName =
+
+                object.state
+                    ?.workplaceName ??
+
+                "Workplace";
+
+
+            let partName =
+                "Part";
+
+
+            if (
+                definition.structureType ===
+                "settlement_workplace_door"
+            ) {
+
+                partName =
+                    "Entrance";
+
+            } else if (
+                definition.structureType ===
+                "settlement_workplace_wall"
+            ) {
+
+                partName =
+                    "Wall";
+
+            } else {
+
+                partName =
+                    "Sign";
+            }
+
+
+            description =
+
+                settlement
+
+                    ? `${partName} of the ${workplaceName} in ${settlement.name}.`
+
+                    : `${partName} of a ${workplaceName}.`;
+
+
+            document.getElementById(
+                "interaction-window-title"
+            ).textContent =
+
+                workplaceName
+                    .toUpperCase();
+        }
 
 
         if (
@@ -9163,6 +11344,98 @@ function renderInteractionInspect() {
             }
         }
 
+        else if (
+            definition.butcher
+        ) {
+
+            const butcher =
+                definition.butcher;
+
+
+            const hasTool =
+
+                !butcher.requiredToolType ||
+
+                hasEquippedToolType(
+                    butcher.requiredToolType
+                );
+
+
+            const outputNames =
+
+                butcher.outputs
+
+                    .map(
+                        output => {
+
+                            const item =
+                                getItemDefinition(
+                                    output.itemId
+                                );
+
+
+                            return item
+                                ? item.name
+                                : output.itemId;
+                        }
+                    )
+
+                    .join(", ");
+
+
+            actionHTML = `
+
+                <div class="settlement-section">
+
+                    <div class="settlement-section-title">
+                        ACTIONS
+                    </div>
+
+                    <button
+                        type="button"
+                        class="settlement-action-button"
+                        data-interaction-action="butcher"
+                        ${
+                            hasTool
+                                ? ""
+                                : "disabled"
+                        }
+                    >
+                        ${escapeHTML(
+                            butcher.actionLabel ??
+                            "Butcher"
+                        )}
+                    </button>
+
+
+                    ${
+                        !hasTool
+
+                            ? `
+
+                                <div class="settlement-list-detail">
+                                    Requires equipped:
+                                    ${escapeHTML(
+                                        butcher.requiredToolLabel ??
+                                        butcher.requiredToolType
+                                    )}
+                                </div>
+                            `
+
+                            : ""
+                    }
+
+
+                    <div class="settlement-list-detail">
+                        Can provide:
+                        ${escapeHTML(
+                            outputNames
+                        )}
+                    </div>
+
+                </div>
+            `;
+        }
 
         else if (
             !object.depleted &&
@@ -9234,13 +11507,19 @@ function renderInteractionInspect() {
 
                     <span>
                         ${escapeHTML(
-                            object.depleted
 
-                                ? definition
-                                    .depletedChar
+                            object.state
+                                ?.renderChar ??
 
-                                : definition
-                                    .char
+                            (
+                                object.depleted
+
+                                    ? definition
+                                        .depletedChar
+
+                                    : definition
+                                        .char
+                            )
                         )}
                     </span>
                 </div>
@@ -9265,26 +11544,49 @@ function renderInteractionInspect() {
 
                     <span>
                         ${
-                            definition.structureType ===
-                            "campfire"
+                            (
+                                definition.structureType ===
+                                    "family_house_wall" ||
 
-                                ? (
-                                    isCampfireLit(
-                                        object
-                                    )
+                                definition.structureType ===
+                                    "family_house_door"
+                            )
 
-                                        ? "Lit"
-
-                                        : "Unlit"
-                                )
+                                ? "Family home"
 
                                 : (
-                                    object.depleted
+                                    definition.structureType ===
+                                        "settlement_workplace_wall" ||
 
-                                        ? "Depleted"
+                                    definition.structureType ===
+                                        "settlement_workplace_door" ||
 
-                                        : "Available"
+                                    definition.structureType ===
+                                        "settlement_workplace_sign"
                                 )
+
+                                    ? "Workplace"
+
+                                    : definition.structureType ===
+                                        "campfire"
+
+                                    ? (
+                                        isCampfireLit(
+                                            object
+                                        )
+
+                                            ? "Lit"
+
+                                            : "Unlit"
+                                    )
+
+                                    : (
+                                        object.depleted
+
+                                            ? "Depleted"
+
+                                            : "Available"
+                                    )
                         }
                     </span>
                 </div>
@@ -10306,8 +12608,8 @@ function canPlayerInteractWithPerson(
 
 
     /*
-        Personen må være i settlementet
-        spilleren faktisk besøker.
+        Person-vinduet må tilhøre settlementet
+        spilleren faktisk har åpnet.
     */
 
     if (
@@ -10319,7 +12621,50 @@ function canPlayerInteractWithPerson(
     }
 
 
+    /*
+        Nytt physical NPC-system.
+
+        Hvis personen finnes fysisk i verden,
+        må spilleren faktisk stå ved siden av dem.
+    */
+
+    if (
+        person.physicalInitialized ===
+            true &&
+
+        Number.isInteger(
+            person.worldX
+        ) &&
+
+        Number.isInteger(
+            person.worldY
+        )
+    ) {
+
+        return (
+
+            getGridDistance(
+
+                player.x,
+                player.y,
+
+                person.worldX,
+                person.worldY
+            ) <=
+
+            DISCOVERY_RULES
+                .settlementInteractionRadius
+        );
+    }
+
+
+    /*
+        Legacy/fallback dersom en person ennå
+        ikke har fått physical position.
+    */
+
     const distance =
+
         getGridDistance(
 
             player.x,
@@ -10331,7 +12676,9 @@ function canPlayerInteractWithPerson(
 
 
     return (
+
         distance <=
+
         DISCOVERY_RULES
             .settlementInteractionRadius
     );
@@ -11017,6 +13364,937 @@ function generateWorldObjects(
     console.log(
         `Generated ${worldObjects.length} natural world objects.`
     );
+}
+
+/* =========================================================
+   CHUNK CONTENT GENERATION
+========================================================= */
+
+function getWorldChunkCoordinates(
+    x,
+    y
+) {
+
+    return {
+
+        x:
+            WORLDGEN.worldToChunk(
+                x
+            ),
+
+        y:
+            WORLDGEN.worldToChunk(
+                y
+            )
+    };
+}
+
+
+function getWorldChunkKeyAt(
+    x,
+    y
+) {
+
+    const chunk =
+        getWorldChunkCoordinates(
+            x,
+            y
+        );
+
+
+    return WORLDGEN.getChunkKey(
+        chunk.x,
+        chunk.y
+    );
+}
+
+
+/* =========================================================
+   NATURAL OBJECTS PER CHUNK
+========================================================= */
+
+function generateNaturalObjectsForChunk(
+    chunkX,
+    chunkY
+) {
+
+    const chunkKey =
+        WORLDGEN.getChunkKey(
+            chunkX,
+            chunkY
+        );
+
+
+    const startX =
+        chunkX *
+        WORLDGEN.CHUNK_SIZE;
+
+    const startY =
+        chunkY *
+        WORLDGEN.CHUNK_SIZE;
+
+
+    /*
+        Ting som allerede finnes på tiles.
+
+        Dette hindrer natural objects fra å
+        dukke opp oppå campfires, carcasses osv.
+    */
+
+    const occupiedTiles =
+        new Set();
+
+
+    for (
+        const object
+        of worldObjects
+    ) {
+
+        occupiedTiles.add(
+            `${object.x},${object.y}`
+        );
+    }
+
+
+    for (
+        let localY = 0;
+        localY <
+            WORLDGEN.CHUNK_SIZE;
+        localY++
+    ) {
+
+        for (
+            let localX = 0;
+            localX <
+                WORLDGEN.CHUNK_SIZE;
+            localX++
+        ) {
+
+            const x =
+                startX +
+                localX;
+
+            const y =
+                startY +
+                localY;
+
+
+            const positionKey =
+                `${x},${y}`;
+
+
+            if (
+                occupiedTiles.has(
+                    positionKey
+                )
+            ) {
+
+                continue;
+            }
+
+
+            const tile =
+                getTile(
+                    x,
+                    y
+                );
+
+
+            if (!tile) {
+
+                continue;
+            }
+
+
+            /*
+                Maksimum ett natural object
+                per tile.
+            */
+
+            for (
+                const definition
+                of WORLD_OBJECT_DEFINITIONS.values()
+            ) {
+
+                const spawn =
+                    definition.spawn ??
+                    {};
+
+
+                const chance =
+
+                    Math.max(
+                        0,
+
+                        Math.min(
+                            1,
+
+                            Number(
+                                spawn.chance ??
+                                0
+                            )
+                        )
+                    );
+
+
+                /*
+                    Structures, carcasses osv.
+                    har ingen natural spawn chance
+                    og ignoreres automatisk.
+                */
+
+                if (
+                    chance <= 0
+                ) {
+
+                    continue;
+                }
+
+
+                if (
+                    !canSpawnWorldObjectAt(
+                        definition,
+                        tile
+                    )
+                ) {
+
+                    continue;
+                }
+
+
+                const seedOffset =
+
+                    Number(
+                        spawn.seedOffset ??
+                        0
+                    ) || 0;
+
+
+                const roll =
+
+                    WORLDGEN.hashNoise(
+
+                        x,
+                        y,
+
+                        WORLD_SEED +
+                            seedOffset
+                    );
+
+
+                if (
+                    roll >=
+                    chance
+                ) {
+
+                    continue;
+                }
+
+
+                const objectId =
+
+                    `natural_${definition.id}_${x}_${y}`;
+
+
+                const savedState =
+                    getNaturalObjectState(
+                        objectId
+                    );
+
+
+                /*
+                    Fallen branches, loose stones osv.
+                    som allerede er tatt skal ikke
+                    genereres på nytt.
+                */
+
+                if (
+                    savedState?.removed ===
+                    true
+                ) {
+
+                    continue;
+                }
+
+
+                const object = {
+
+                    id:
+                        objectId,
+
+                    type:
+                        definition.id,
+
+                    x,
+                    y,
+
+                    depleted:
+
+                        savedState?.depleted ===
+                        true,
+
+                    regrowAtMinutes:
+
+                        savedState
+                            ?.regrowAtMinutes ??
+                        null,
+
+                    state: {
+
+                        ...definition.initialState
+                    },
+
+                    generatedChunkKey:
+                        chunkKey
+                };
+
+
+                worldObjects.push(
+                    object
+                );
+
+
+                occupiedTiles.add(
+                    positionKey
+                );
+
+
+                break;
+            }
+        }
+    }
+
+
+    window.worldObjects =
+        worldObjects;
+}
+
+
+/* =========================================================
+   CREATURES PER CHUNK
+========================================================= */
+
+function getCreatureTypeSeed(
+    creatureType
+) {
+
+    let hash =
+        2166136261;
+
+
+    const value =
+        String(
+            creatureType
+        );
+
+
+    for (
+        let i = 0;
+        i < value.length;
+        i++
+    ) {
+
+        hash ^=
+            value.charCodeAt(
+                i
+            );
+
+
+        hash =
+            Math.imul(
+                hash,
+                16777619
+            );
+    }
+
+
+    return hash | 0;
+}
+
+
+function generateCreaturesForChunk(
+    chunkX,
+    chunkY
+) {
+
+    const chunkKey =
+        WORLDGEN.getChunkKey(
+            chunkX,
+            chunkY
+        );
+
+
+    const startX =
+        chunkX *
+        WORLDGEN.CHUNK_SIZE;
+
+    const startY =
+        chunkY *
+        WORLDGEN.CHUNK_SIZE;
+
+
+    for (
+        let localY = 0;
+        localY <
+            WORLDGEN.CHUNK_SIZE;
+        localY++
+    ) {
+
+        for (
+            let localX = 0;
+            localX <
+                WORLDGEN.CHUNK_SIZE;
+            localX++
+        ) {
+
+            const x =
+                startX +
+                localX;
+
+            const y =
+                startY +
+                localY;
+
+
+            const tile =
+                getTile(
+                    x,
+                    y
+                );
+
+
+            if (!tile) {
+
+                continue;
+            }
+
+
+            for (
+                const definition
+                of CREATURE_DEFINITIONS.values()
+            ) {
+
+                const spawn =
+                    definition.spawn ??
+                    {};
+
+
+                const oldWorldCount =
+
+                    Math.max(
+                        0,
+
+                        Number(
+                            spawn.count ??
+                            0
+                        )
+                    );
+
+
+                if (
+                    oldWorldCount <= 0
+                ) {
+
+                    continue;
+                }
+
+
+                /*
+                    Konverter gammel world-count
+                    til deterministic tile density.
+
+                    Eksempel:
+                    25 spiders i gamle 300x300
+                    tilsvarer samme omtrentlige
+                    density i infinite world.
+                */
+
+                const spawnChance =
+
+                    oldWorldCount /
+                    CREATURE_REFERENCE_AREA;
+
+
+                if (
+                    spawn.biomes.length > 0 &&
+                    !spawn.biomes.includes(
+                        tile.biome
+                    )
+                ) {
+
+                    continue;
+                }
+
+
+                if (
+                    spawn.tileTypes.length > 0 &&
+                    !spawn.tileTypes.includes(
+                        tile.type
+                    )
+                ) {
+
+                    continue;
+                }
+
+
+                const typeSeed =
+                    getCreatureTypeSeed(
+                        definition.id
+                    );
+
+
+                const roll =
+
+                    WORLDGEN.hashNoise(
+
+                        x,
+                        y,
+
+                        WORLD_SEED +
+                        700000 +
+                        typeSeed
+                    );
+
+
+                if (
+                    roll >=
+                    spawnChance
+                ) {
+
+                    continue;
+                }
+
+
+                if (
+                    !canCreatureSpawnAt(
+
+                        definition,
+
+                        x,
+                        y
+                    )
+                ) {
+
+                    continue;
+                }
+
+
+                const creatureId =
+
+                    `wild_${definition.id}_${x}_${y}`;
+
+                const savedState =
+                    getWildCreatureState(
+                        creatureId
+                    );
+
+
+                /*
+                    Dead creature skal aldri respawne.
+                */
+
+                if (
+                    savedState?.alive ===
+                    false
+                ) {
+
+                    continue;
+                }
+
+
+                let creatureX =
+                    x;
+
+                let creatureY =
+                    y;
+
+                let creatureHp =
+                    definition.maxHp;
+
+
+                if (savedState) {
+
+                    creatureX =
+                        savedState.x;
+
+                    creatureY =
+                        savedState.y;
+
+                    creatureHp =
+                        savedState.hp;
+                }
+
+
+                /*
+                    Creature kan ha beveget seg bort
+                    fra sin originale spawn tile.
+                */
+
+                if (
+                    getCreatureById(
+                        creatureId
+                    )
+                ) {
+
+                    continue;
+                }
+
+
+                /*
+                    Hvis creature tidligere har beveget seg,
+                    prøver vi å gjenopprette den der den var.
+                */
+
+                if (
+                    !canCreatureSpawnAt(
+
+                        definition,
+
+                        creatureX,
+                        creatureY
+                    )
+                ) {
+
+                    creatureX =
+                        x;
+
+                    creatureY =
+                        y;
+                }
+
+
+                if (
+                    !canCreatureSpawnAt(
+
+                        definition,
+
+                        creatureX,
+                        creatureY
+                    )
+                ) {
+
+                    continue;
+                }
+
+
+                createCreature(
+
+                    definition.id,
+
+                    creatureX,
+                    creatureY,
+
+                    {
+                        id:
+                            creatureId,
+
+                        hp:
+                            creatureHp,
+
+                        generatedChunkKey:
+                            chunkKey
+                    }
+                );
+
+
+                /*
+                    Bare én creature per tile.
+                */
+
+                break;
+            }
+        }
+    }
+
+
+    window.creatures =
+        creatures;
+}
+
+
+/* =========================================================
+   GENERATE COMPLETE CHUNK CONTENT
+========================================================= */
+
+function generateContentForChunk(
+    chunkX,
+    chunkY
+) {
+
+    const chunkKey =
+        WORLDGEN.getChunkKey(
+            chunkX,
+            chunkY
+        );
+
+
+    if (
+        loadedContentChunkKeys.has(
+            chunkKey
+        )
+    ) {
+
+        return;
+    }
+
+    /*
+        Civilization geography først.
+
+        Dermed vet nature/creatures hvilke tiles
+        som allerede brukes av settlements.
+    */
+
+    generateSettlementsForChunk(
+        chunkX,
+        chunkY
+    );
+
+
+    /*
+        Houses må genereres før nature og creatures,
+        slik at bushes/animals ikke spawner oppå dem.
+    */
+
+    generateSettlementStructuresForChunk(
+        chunkX,
+        chunkY
+    );
+
+
+    restorePersistentObjectsForChunk(
+        chunkX,
+        chunkY
+    );
+
+
+    generateNaturalObjectsForChunk(
+        chunkX,
+        chunkY
+    );
+
+
+    generateCreaturesForChunk(
+        chunkX,
+        chunkY
+    );
+
+
+    loadedContentChunkKeys.add(
+        chunkKey
+    );
+}
+
+
+/* =========================================================
+   ACTIVE CHUNK CONTENT
+========================================================= */
+
+function syncActiveChunkContent() {
+
+    const centerChunkX =
+        WORLDGEN.worldToChunk(
+            player.x
+        );
+
+    const centerChunkY =
+        WORLDGEN.worldToChunk(
+            player.y
+        );
+
+
+    const wanted =
+        new Set();
+
+
+    for (
+        let dy =
+            -WORLDGEN.ACTIVE_CHUNK_RADIUS;
+
+        dy <=
+            WORLDGEN.ACTIVE_CHUNK_RADIUS;
+
+        dy++
+    ) {
+
+        for (
+            let dx =
+                -WORLDGEN.ACTIVE_CHUNK_RADIUS;
+
+            dx <=
+                WORLDGEN.ACTIVE_CHUNK_RADIUS;
+
+            dx++
+        ) {
+
+            const chunkX =
+                centerChunkX +
+                dx;
+
+            const chunkY =
+                centerChunkY +
+                dy;
+
+
+            const key =
+                WORLDGEN.getChunkKey(
+                    chunkX,
+                    chunkY
+                );
+
+
+            wanted.add(
+                key
+            );
+
+
+            generateContentForChunk(
+                chunkX,
+                chunkY
+            );
+        }
+    }
+
+    /*
+        Lagre creature-state før chunks unloades.
+    */
+
+    for (
+        const creature
+        of creatures
+    ) {
+
+        if (
+            creature.generatedChunkKey &&
+            !wanted.has(
+                creature.generatedChunkKey
+            )
+        ) {
+
+            saveWildCreatureState(
+                creature
+            );
+        }
+    }
+
+
+    /*
+        Lagre persistent objects før de
+        tas ut av active arrays.
+    */
+
+    for (
+        const object
+        of worldObjects
+    ) {
+
+        if (
+            object.persistentChunkKey &&
+            !wanted.has(
+                object.persistentChunkKey
+            )
+        ) {
+
+            savePersistentWorldObject(
+                object
+            );
+        }
+    }
+
+    /*
+        Fjern generated natural objects
+        fra chunks som ikke lenger er aktive.
+
+        Placed objects / carcasses har ikke
+        generatedChunkKey og beholdes.
+    */
+
+    worldObjects =
+
+        worldObjects.filter(
+            object => {
+
+                /*
+                    Generated natural object.
+                */
+
+                if (
+                    object.generatedChunkKey
+                ) {
+
+                    return wanted.has(
+                        object.generatedChunkKey
+                    );
+                }
+
+
+                /*
+                    Campfire, carcass osv.
+                */
+
+                if (
+                    object.persistentChunkKey
+                ) {
+
+                    return wanted.has(
+                        object.persistentChunkKey
+                    );
+                }
+
+
+                return true;
+            }
+        );
+
+
+    /*
+        Wild creatures holdes bare aktive
+        rundt spilleren.
+    */
+
+    creatures =
+
+        creatures.filter(
+            creature =>
+
+                !creature.generatedChunkKey ||
+
+                wanted.has(
+                    creature.generatedChunkKey
+                )
+        );
+
+
+    /*
+        Chunks som forlater active radius
+        kan genereres igjen senere.
+
+        Persistence av endringer kommer
+        i Pass 4.
+    */
+
+    for (
+        const key
+        of loadedContentChunkKeys
+    ) {
+
+        if (
+            !wanted.has(
+                key
+            )
+        ) {
+
+            loadedContentChunkKeys.delete(
+                key
+            );
+        }
+    }
+
+
+    window.worldObjects =
+        worldObjects;
+
+    window.creatures =
+        creatures;
 }
 
 /* =========================================================
@@ -14162,6 +17440,7879 @@ function createSettlement(
 }
 
 /* =========================================================
+   INFINITE SETTLEMENT GENERATION
+========================================================= */
+
+function getSettlementRegionKey(
+    regionX,
+    regionY
+) {
+
+    return `${regionX},${regionY}`;
+}
+
+
+function getSettlementRegionSeed(
+    regionX,
+    regionY
+) {
+
+    return (
+
+        1 +
+
+        Math.floor(
+
+            WORLDGEN.hashNoise(
+
+                regionX,
+                regionY,
+
+                WORLD_SEED +
+                    83000
+            ) *
+
+            2147483646
+        )
+    );
+}
+
+
+/* =========================================================
+   VALID INFINITE SETTLEMENT LOCATION
+========================================================= */
+
+function canFoundInfiniteSettlementAt(
+    x,
+    y
+) {
+
+    const tile =
+        getTile(
+            x,
+            y
+        );
+
+
+    if (!tile) {
+
+        return false;
+    }
+
+
+    if (
+        tile.river
+    ) {
+
+        return false;
+    }
+
+
+    /*
+        Første civilization-wave bygges ikke
+        midt i ugjennomtrengelig terrain.
+    */
+
+    if (
+        tile.type === "tree" ||
+        tile.type === "pine" ||
+        tile.type === "mountain" ||
+        tile.type === "deepWater" ||
+        tile.type === "shallowWater"
+    ) {
+
+        return false;
+    }
+
+
+    if (
+        tile.biome === "ocean" ||
+        tile.biome === "mountain" ||
+        tile.biome === "swamp"
+    ) {
+
+        return false;
+    }
+
+
+    return true;
+}
+
+
+/* =========================================================
+   EVALUATE INFINITE SETTLEMENT SITE
+========================================================= */
+
+function evaluateInfiniteSettlementSite(
+    centerX,
+    centerY
+) {
+
+    let fertility =
+        0;
+
+    let timber =
+        0;
+
+    let stone =
+        0;
+
+    let iron =
+        0;
+
+    let freshWater =
+        0;
+
+    let elevationDifference =
+        0;
+
+    let samples =
+        0;
+
+
+    const centerTile =
+        getTile(
+            centerX,
+            centerY
+        );
+
+
+    if (!centerTile) {
+
+        return null;
+    }
+
+
+    for (
+        let dy =
+            -SETTLEMENT_SITE_RADIUS;
+
+        dy <=
+            SETTLEMENT_SITE_RADIUS;
+
+        dy++
+    ) {
+
+        for (
+            let dx =
+                -SETTLEMENT_SITE_RADIUS;
+
+            dx <=
+                SETTLEMENT_SITE_RADIUS;
+
+            dx++
+        ) {
+
+            const tile =
+
+                getTile(
+
+                    centerX + dx,
+                    centerY + dy
+                );
+
+
+            if (
+                !tile ||
+                tile.biome === "ocean"
+            ) {
+
+                continue;
+            }
+
+
+            fertility +=
+                tile.resources
+                    .fertility;
+
+            timber +=
+                tile.resources
+                    .timber;
+
+            stone +=
+                tile.resources
+                    .stone;
+
+            iron +=
+                tile.resources
+                    .iron;
+
+
+            freshWater =
+
+                Math.max(
+
+                    freshWater,
+
+                    tile.resources
+                        .freshWater
+                );
+
+
+            elevationDifference +=
+
+                Math.abs(
+
+                    tile.elevation -
+                    centerTile.elevation
+                );
+
+
+            samples++;
+        }
+    }
+
+
+    if (
+        samples === 0
+    ) {
+
+        return null;
+    }
+
+
+    fertility /=
+        samples;
+
+    timber /=
+        samples;
+
+    stone /=
+        samples;
+
+    iron /=
+        samples;
+
+
+    const averageSlope =
+
+        elevationDifference /
+        samples;
+
+
+    const flatness =
+
+        Math.max(
+
+            0,
+
+            Math.min(
+
+                1,
+
+                1 -
+                averageSlope *
+                    9
+            )
+        );
+
+
+    let score =
+
+        fertility *
+            0.34 +
+
+        freshWater *
+            0.25 +
+
+        flatness *
+            0.18 +
+
+        timber *
+            0.12 +
+
+        stone *
+            0.07 +
+
+        iron *
+            0.04;
+
+
+    /*
+        Litt deterministic variation gjør at
+        civilization ikke alltid velger den
+        matematisk perfekte tile.
+    */
+
+    score +=
+
+        WORLDGEN.hashNoise(
+
+            centerX,
+            centerY,
+
+            WORLD_SEED +
+                82000
+        ) *
+
+        0.025;
+
+
+    if (
+        centerTile.biome ===
+        "desert"
+    ) {
+
+        score -=
+            0.16;
+    }
+
+
+    if (
+        centerTile.biome ===
+        "tundra"
+    ) {
+
+        score -=
+            0.10;
+    }
+
+
+    score =
+
+        Math.max(
+
+            0,
+
+            Math.min(
+                1,
+                score
+            )
+        );
+
+
+    return {
+
+        x:
+            centerX,
+
+        y:
+            centerY,
+
+        score,
+
+        fertility,
+
+        timber,
+
+        stone,
+
+        iron,
+
+        freshWater,
+
+        flatness
+    };
+}
+
+
+/* =========================================================
+   DETERMINISTIC SETTLEMENT NAME
+========================================================= */
+
+function generateInfiniteSettlementName(
+    random
+) {
+
+    const prefix =
+
+        SETTLEMENT_NAME_PREFIXES[
+
+            Math.floor(
+
+                random() *
+
+                SETTLEMENT_NAME_PREFIXES.length
+            )
+        ];
+
+
+    const suffix =
+
+        SETTLEMENT_NAME_SUFFIXES[
+
+            Math.floor(
+
+                random() *
+
+                SETTLEMENT_NAME_SUFFIXES.length
+            )
+        ];
+
+
+    return (
+        prefix +
+        suffix
+    );
+}
+
+
+/* =========================================================
+   CREATE INFINITE SETTLEMENT
+========================================================= */
+
+function createInfiniteSettlement(
+    site,
+    regionX,
+    regionY,
+    random
+) {
+
+    const tile =
+        getTile(
+            site.x,
+            site.y
+        );
+
+
+const houseCapacity =
+
+    Math.max(
+
+        1,
+
+        Math.floor(
+            site.houseCapacity ??
+            1
+        )
+    );
+
+
+    /*
+        Bestem først hvilken størrelse
+        settlementet ønsker å starte som.
+
+        Dette er uavhengig av hvor mye fysisk
+        plass området totalt har.
+    */
+
+    const scaleRoll =
+
+        WORLDGEN.hashNoise(
+
+            site.x,
+            site.y,
+
+            WORLD_SEED +
+                86400
+        );
+
+
+    let selectedScale =
+
+        SETTLEMENT_DEVELOPMENT_RULES
+            .startingScales[
+                SETTLEMENT_DEVELOPMENT_RULES
+                    .startingScales.length -
+                1
+            ];
+
+
+    for (
+        const scale
+        of SETTLEMENT_DEVELOPMENT_RULES
+            .startingScales
+    ) {
+
+        if (
+            scaleRoll <=
+            scale.maxRoll
+        ) {
+
+            selectedScale =
+                scale;
+
+            break;
+        }
+    }
+
+
+    /*
+        Terrain setter fortsatt et hardt tak.
+
+        Hvis roll ønsker en City, men terrenget
+        bare har plass til 5 houses, kan stedet
+        maksimum starte med 5 families.
+    */
+
+    const minimumFamilies =
+
+        Math.min(
+
+            houseCapacity,
+
+            selectedScale.minFamilies
+        );
+
+
+    const maximumFamilies =
+
+        Math.min(
+
+            houseCapacity,
+
+            selectedScale.maxFamilies
+        );
+
+
+    const familyCountRoll =
+
+        WORLDGEN.hashNoise(
+
+            site.x,
+            site.y,
+
+            WORLD_SEED +
+                86450
+        );
+
+
+    let startingFamilyTarget =
+
+        minimumFamilies;
+
+
+    if (
+        maximumFamilies >
+        minimumFamilies
+    ) {
+
+        startingFamilyTarget +=
+
+            Math.floor(
+
+                familyCountRoll *
+
+                (
+                    maximumFamilies -
+                    minimumFamilies +
+                    1
+                )
+            );
+    }
+
+
+    startingFamilyTarget =
+
+        Math.max(
+
+            1,
+
+            Math.min(
+
+                houseCapacity,
+
+                startingFamilyTarget
+            )
+        );
+
+
+    /*
+        Population target følger nå antall families.
+
+        Omtrent 3–4.5 personer per familie,
+        men den faktiske family-generatoren bestemmer
+        fortsatt den virkelige family composition.
+    */
+
+    const populationRoll =
+
+        WORLDGEN.hashNoise(
+
+            site.x,
+            site.y,
+
+            WORLD_SEED +
+                86500
+        );
+
+
+    const populationPerFamily =
+
+        3 +
+
+        populationRoll *
+            1.5;
+
+
+    const startingPopulationTarget =
+
+        Math.max(
+
+            startingFamilyTarget,
+
+            Math.min(
+
+                90,
+
+                Math.round(
+
+                    startingFamilyTarget *
+                    populationPerFamily
+                )
+            )
+        );
+
+
+    return {
+
+        /*
+            ID avhenger av geography,
+            ikke generation order.
+        */
+
+        id:
+
+            `settlement_${regionX}_${regionY}`,
+
+        name:
+
+            generateInfiniteSettlementName(
+                random
+            ),
+
+        factionId:
+            null,
+
+        familyIds:
+            [],
+
+        x:
+            site.x,
+
+        y:
+            site.y,
+
+        regionX,
+        regionY,
+
+        foundedYear:
+            WORLD_START_YEAR,
+
+        startingFamilyTarget,
+
+        startingPopulationTarget,
+
+        /*
+            Population blir aktivert i neste pass.
+        */
+
+        population:
+            0,
+
+        populationGenerated:
+            false,
+
+        populationLoaded:
+            false,
+
+        populationArchive:
+            null,
+
+
+        /*
+            Fysisk village-layout.
+        */
+
+        layoutGenerated:
+            false,
+
+        houseCapacity,
+
+        housePlacements:
+            [],
+
+        workplacePlacements:
+            [],
+
+        pathTiles:
+            [],
+
+
+        inventory:
+            {},
+
+        coins:
+            0,
+
+        productionRemainders:
+            {},
+
+        foodSecurity: {
+
+            initialized:
+                false,
+
+            dailyNeed:
+                0,
+
+            consumed:
+                0,
+
+            coverage:
+                1,
+
+            shortageDays:
+                0
+        },
+
+        biome:
+            tile.biome,
+
+        siteScore:
+            site.score,
+
+        resources: {
+
+            fertility:
+                site.fertility,
+
+            timber:
+                site.timber,
+
+            stone:
+                site.stone,
+
+            iron:
+                site.iron,
+
+            freshWater:
+                site.freshWater
+        },
+
+        char:
+            "H",
+
+        color:
+            "#f1d680"
+    };
+}
+
+/* =========================================================
+   INFINITE FACTION GENERATION
+========================================================= */
+
+function getFactionCellCoordinates(
+    x,
+    y
+) {
+
+    return {
+
+        x:
+            Math.floor(
+                x /
+                FACTION_TERRITORY_RULES
+                    .cellSize
+            ),
+
+        y:
+            Math.floor(
+                y /
+                FACTION_TERRITORY_RULES
+                    .cellSize
+            )
+    };
+}
+
+
+function getInfiniteFactionId(
+    cellX,
+    cellY
+) {
+
+    return (
+        `faction_${cellX}_${cellY}`
+    );
+}
+
+
+/* =========================================================
+   DETERMINISTIC FACTION NAME
+========================================================= */
+
+function generateInfiniteFactionName(
+    cellX,
+    cellY
+) {
+
+    const prefixIndex =
+
+        Math.floor(
+
+            WORLDGEN.hashNoise(
+
+                cellX,
+                cellY,
+
+                WORLD_SEED +
+                    85100
+            ) *
+
+            FACTION_PREFIXES.length
+        );
+
+
+    const suffixIndex =
+
+        Math.floor(
+
+            WORLDGEN.hashNoise(
+
+                cellX,
+                cellY,
+
+                WORLD_SEED +
+                    85200
+            ) *
+
+            FACTION_SUFFIXES.length
+        );
+
+
+    /*
+        Ekstra homeland-navn gjør at infinite
+        world ikke ender med veldig mange
+        identiske "Northern League".
+    */
+
+    const homelandPrefixIndex =
+
+        Math.floor(
+
+            WORLDGEN.hashNoise(
+
+                cellX,
+                cellY,
+
+                WORLD_SEED +
+                    85300
+            ) *
+
+            SETTLEMENT_NAME_PREFIXES.length
+        );
+
+
+    const homelandSuffixIndex =
+
+        Math.floor(
+
+            WORLDGEN.hashNoise(
+
+                cellX,
+                cellY,
+
+                WORLD_SEED +
+                    85400
+            ) *
+
+            SETTLEMENT_NAME_SUFFIXES.length
+        );
+
+
+    const homeland =
+
+        SETTLEMENT_NAME_PREFIXES[
+            homelandPrefixIndex
+        ] +
+
+        SETTLEMENT_NAME_SUFFIXES[
+            homelandSuffixIndex
+        ];
+
+
+    return (
+
+        `${FACTION_PREFIXES[prefixIndex]} ` +
+        `${FACTION_SUFFIXES[suffixIndex]} ` +
+        `of ${homeland}`
+    );
+}
+
+
+/* =========================================================
+   FACTION CANDIDATE
+========================================================= */
+
+function getInfiniteFactionCandidate(
+    cellX,
+    cellY
+) {
+
+    const roll =
+
+        WORLDGEN.hashNoise(
+
+            cellX,
+            cellY,
+
+            WORLD_SEED +
+                85000
+        );
+
+
+    if (
+        roll >
+        FACTION_TERRITORY_RULES
+            .spawnChance
+    ) {
+
+        return null;
+    }
+
+
+    const cellSize =
+        FACTION_TERRITORY_RULES
+            .cellSize;
+
+
+    const margin =
+        FACTION_TERRITORY_RULES
+            .anchorMargin;
+
+
+    const usableFraction =
+
+        1 -
+        margin * 2;
+
+
+    const anchorX =
+
+        Math.floor(
+
+            cellX *
+                cellSize +
+
+            cellSize *
+
+            (
+                margin +
+
+                WORLDGEN.hashNoise(
+
+                    cellX,
+                    cellY,
+
+                    WORLD_SEED +
+                        85500
+                ) *
+
+                usableFraction
+            )
+        );
+
+
+    const anchorY =
+
+        Math.floor(
+
+            cellY *
+                cellSize +
+
+            cellSize *
+
+            (
+                margin +
+
+                WORLDGEN.hashNoise(
+
+                    cellX,
+                    cellY,
+
+                    WORLD_SEED +
+                        85600
+                ) *
+
+                usableFraction
+            )
+        );
+
+
+    /*
+        Ikke lag faction-center midt ute i havet.
+    */
+
+    const anchorTile =
+        getTile(
+            anchorX,
+            anchorY
+        );
+
+
+    if (
+        !anchorTile ||
+        anchorTile.biome ===
+            "ocean"
+    ) {
+
+        return null;
+    }
+
+
+    const colorIndex =
+
+        Math.floor(
+
+            WORLDGEN.hashNoise(
+
+                cellX,
+                cellY,
+
+                WORLD_SEED +
+                    85700
+            ) *
+
+            FACTION_COLORS.length
+        );
+
+
+    return {
+
+        id:
+            getInfiniteFactionId(
+                cellX,
+                cellY
+            ),
+
+        cellX,
+        cellY,
+
+        anchorX,
+        anchorY,
+
+        /*
+            Regionen som inneholder anchor blir
+            factionens deterministic capital-region.
+        */
+
+        capitalRegionX:
+
+            Math.floor(
+
+                anchorX /
+                SETTLEMENT_REGION_SIZE
+            ),
+
+        capitalRegionY:
+
+            Math.floor(
+
+                anchorY /
+                SETTLEMENT_REGION_SIZE
+            ),
+
+        name:
+
+            generateInfiniteFactionName(
+                cellX,
+                cellY
+            ),
+
+        color:
+
+            FACTION_COLORS[
+                colorIndex
+            ]
+    };
+}
+
+/* =========================================================
+   FIND FACTION FOR SETTLEMENT
+========================================================= */
+
+function findFactionCandidateForSettlement(
+    settlement
+) {
+
+    if (!settlement) {
+
+        return null;
+    }
+
+
+    const centerCell =
+        getFactionCellCoordinates(
+
+            settlement.x,
+            settlement.y
+        );
+
+
+    let bestCandidate =
+        null;
+
+    let bestDistance =
+        Infinity;
+
+
+    /*
+        3 x 3 faction-celler er nok fordi
+        max claim distance er mindre enn dette.
+    */
+
+    for (
+        let dy = -1;
+        dy <= 1;
+        dy++
+    ) {
+
+        for (
+            let dx = -1;
+            dx <= 1;
+            dx++
+        ) {
+
+            const candidate =
+
+                getInfiniteFactionCandidate(
+
+                    centerCell.x + dx,
+                    centerCell.y + dy
+                );
+
+
+            if (!candidate) {
+
+                continue;
+            }
+
+
+            const distance =
+
+                getWorldDistance(
+
+                    settlement.x,
+                    settlement.y,
+
+                    candidate.anchorX,
+                    candidate.anchorY
+                );
+
+
+            if (
+                distance <
+                bestDistance
+            ) {
+
+                bestDistance =
+                    distance;
+
+                bestCandidate =
+                    candidate;
+            }
+        }
+    }
+
+
+    if (
+        !bestCandidate ||
+        bestDistance >
+            FACTION_TERRITORY_RULES
+                .maxClaimDistance
+    ) {
+
+        return null;
+    }
+
+
+    return bestCandidate;
+}
+
+function getOrCreateInfiniteFaction(
+    candidate
+) {
+
+    if (!candidate) {
+
+        return null;
+    }
+
+
+    const existing =
+        getFactionById(
+            candidate.id
+        );
+
+
+    if (existing) {
+
+        return existing;
+    }
+
+
+    const faction = {
+
+        id:
+            candidate.id,
+
+        name:
+            candidate.name,
+
+        foundedYear:
+            WORLD_START_YEAR,
+
+        capitalSettlementId:
+            null,
+
+        settlementIds:
+            [],
+
+        population:
+            0,
+
+        anchorX:
+            candidate.anchorX,
+
+        anchorY:
+            candidate.anchorY,
+
+        cellX:
+            candidate.cellX,
+
+        cellY:
+            candidate.cellY,
+
+        capitalRegionX:
+            candidate.capitalRegionX,
+
+        capitalRegionY:
+            candidate.capitalRegionY,
+
+        color:
+            candidate.color
+    };
+
+
+    factions.push(
+        faction
+    );
+
+
+    window.factions =
+        factions;
+
+
+    return faction;
+}
+
+function updateSettlementFactionReferences(
+    settlement
+) {
+
+    if (!settlement) {
+
+        return;
+    }
+
+
+    for (
+        const family
+        of families
+    ) {
+
+        if (
+            family.settlementId ===
+            settlement.id
+        ) {
+
+            family.factionId =
+                settlement.factionId;
+        }
+    }
+
+
+    for (
+        const person
+        of people
+    ) {
+
+        if (
+            person.settlementId ===
+            settlement.id
+        ) {
+
+            person.factionId =
+                settlement.factionId;
+        }
+    }
+
+
+    /*
+        Pass 5C archive support.
+
+        Optional chaining gjør at denne delen
+        også er trygg dersom settlement ikke
+        har vært dormant ennå.
+    */
+
+    const archive =
+        settlement.populationArchive;
+
+
+    if (archive) {
+
+        for (
+            const family
+            of archive.families ?? []
+        ) {
+
+            family.factionId =
+                settlement.factionId;
+        }
+
+
+        for (
+            const person
+            of archive.people ?? []
+        ) {
+
+            person.factionId =
+                settlement.factionId;
+        }
+    }
+}
+
+function assignInfiniteFactionToSettlement(
+    settlement
+) {
+
+    if (
+        !settlement ||
+        settlement.factionId
+    ) {
+
+        return;
+    }
+
+
+    const candidate =
+        findFactionCandidateForSettlement(
+            settlement
+        );
+
+
+    /*
+        Ingen faction i nærheten:
+        settlementet forblir Independent.
+    */
+
+    if (!candidate) {
+
+        return;
+    }
+
+
+    const faction =
+        getOrCreateInfiniteFaction(
+            candidate
+        );
+
+
+    if (!faction) {
+
+        return;
+    }
+
+
+    settlement.factionId =
+        faction.id;
+
+
+    /*
+        Settlement-marker får factionens farge.
+    */
+
+    settlement.color =
+        faction.color;
+
+
+    if (
+        !faction.settlementIds.includes(
+            settlement.id
+        )
+    ) {
+
+        faction.settlementIds.push(
+            settlement.id
+        );
+    }
+
+
+    /*
+        Capital bestemmes av en bestemt
+        settlement-region rundt faction anchor.
+
+        Dermed avhenger det IKKE av hvilken
+        retning spilleren utforsket først.
+    */
+
+    if (
+        settlement.regionX ===
+            faction.capitalRegionX &&
+
+        settlement.regionY ===
+            faction.capitalRegionY
+    ) {
+
+        faction.capitalSettlementId =
+            settlement.id;
+    }
+
+
+    updateSettlementFactionReferences(
+        settlement
+    );
+
+
+    refreshInfiniteFactionPopulation(
+        faction
+    );
+}
+
+function refreshInfiniteFactionPopulation(
+    faction
+) {
+
+    if (!faction) {
+
+        return;
+    }
+
+
+    faction.population =
+
+        faction.settlementIds
+
+        .map(
+            getSettlementById
+        )
+
+        .filter(
+            Boolean
+        )
+
+        .reduce(
+
+            (
+                total,
+                settlement
+            ) =>
+
+                total +
+                (
+                    settlement.population ??
+                    0
+                ),
+
+            0
+        );
+}
+
+
+function refreshAllInfiniteFactionPopulations() {
+
+    for (
+        const faction
+        of factions
+    ) {
+
+        refreshInfiniteFactionPopulation(
+            faction
+        );
+    }
+}
+
+/* =========================================================
+   ENSURE SETTLEMENT REGION
+========================================================= */
+
+function ensureSettlementRegion(
+    regionX,
+    regionY
+) {
+
+    const regionKey =
+        getSettlementRegionKey(
+            regionX,
+            regionY
+        );
+
+
+    if (
+        generatedSettlementRegionKeys.has(
+            regionKey
+        )
+    ) {
+
+        return;
+    }
+
+
+    /*
+        Marker regionen med én gang.
+
+        Den kan også ende opp uten settlement.
+    */
+
+    generatedSettlementRegionKeys.add(
+        regionKey
+    );
+
+
+    const regionRoll =
+
+        WORLDGEN.hashNoise(
+
+            regionX,
+            regionY,
+
+            WORLD_SEED +
+                83100
+        );
+
+
+    if (
+        regionRoll >
+        SETTLEMENT_REGION_CHANCE
+    ) {
+
+        return;
+    }
+
+
+    const random =
+
+        createRandom(
+
+            getSettlementRegionSeed(
+                regionX,
+                regionY
+            )
+        );
+
+
+    const regionStartX =
+
+        regionX *
+        SETTLEMENT_REGION_SIZE;
+
+
+    const regionStartY =
+
+        regionY *
+        SETTLEMENT_REGION_SIZE;
+
+
+    const usableSize =
+
+        SETTLEMENT_REGION_SIZE -
+
+        SETTLEMENT_REGION_MARGIN *
+            2;
+
+
+    let bestSite =
+        null;
+
+
+    for (
+        let attempt = 0;
+
+        attempt <
+            SETTLEMENT_CANDIDATES_PER_REGION;
+
+        attempt++
+    ) {
+
+        const x =
+
+            regionStartX +
+
+            SETTLEMENT_REGION_MARGIN +
+
+            Math.floor(
+
+                random() *
+                usableSize
+            );
+
+
+        const y =
+
+            regionStartY +
+
+            SETTLEMENT_REGION_MARGIN +
+
+            Math.floor(
+
+                random() *
+                usableSize
+            );
+
+
+        if (
+            !canFoundInfiniteSettlementAt(
+                x,
+                y
+            )
+        ) {
+
+            continue;
+        }
+
+
+        const site =
+
+            evaluateInfiniteSettlementSite(
+                x,
+                y
+            );
+
+
+        if (!site) {
+
+            continue;
+        }
+
+
+        if (
+            !bestSite ||
+            site.score >
+                bestSite.score
+        ) {
+
+            /*
+                Et settlement-site må kunne romme
+                minst ett fysisk family house.
+
+                Vi trenger bare x/y for denne testen,
+                så vi trenger ikke opprette selve
+                settlementet ennå.
+            */
+
+            const houseCapacity =
+
+                getSettlementHouseCapacity({
+
+                    x:
+                        site.x,
+
+                    y:
+                        site.y
+                });
+
+
+            if (
+                houseCapacity <= 0
+            ) {
+
+                continue;
+            }
+
+
+            /*
+                Behold kapasiteten sammen med site-data.
+
+                Da trenger vi ikke regne den ut
+                på nytt når settlementet opprettes.
+            */
+
+            site.houseCapacity =
+                houseCapacity;
+
+
+            bestSite =
+                site;
+        }
+    }
+
+
+    if (
+        !bestSite ||
+        bestSite.score <
+            INFINITE_SETTLEMENT_MIN_SCORE
+    ) {
+
+        return;
+    }
+
+
+    const settlement =
+
+        createInfiniteSettlement(
+
+            bestSite,
+
+            regionX,
+            regionY,
+
+            random
+        );
+
+
+    settlements.push(
+        settlement
+    );
+
+
+    /*
+        Faction må bestemmes FØR population.
+
+        Da blir family.factionId og
+        person.factionId riktig allerede når
+        menneskene opprettes.
+    */
+
+    assignInfiniteFactionToSettlement(
+        settlement
+    );
+
+
+    /*
+        Fyll settlementet med deterministic
+        population.
+    */
+
+    ensureInfiniteSettlementPopulation(
+        settlement
+    );
+
+
+    refreshInfiniteFactionPopulation(
+
+        getFactionById(
+            settlement.factionId
+        )
+    );
+
+
+    const tile =
+
+        getTile(
+
+            settlement.x,
+            settlement.y
+        );
+
+
+    if (tile) {
+
+        tile.settlementId =
+            settlement.id;
+    }
+
+
+    window.settlements =
+        settlements;
+}
+
+
+/* =========================================================
+   SETTLEMENTS FOR CHUNK
+========================================================= */
+
+function generateSettlementsForChunk(
+    chunkX,
+    chunkY
+) {
+
+    const startX =
+
+        chunkX *
+        WORLDGEN.CHUNK_SIZE;
+
+
+    const startY =
+
+        chunkY *
+        WORLDGEN.CHUNK_SIZE;
+
+
+    const endX =
+
+        startX +
+        WORLDGEN.CHUNK_SIZE -
+        1;
+
+
+    const endY =
+
+        startY +
+        WORLDGEN.CHUNK_SIZE -
+        1;
+
+
+    const firstRegionX =
+
+        Math.floor(
+
+            startX /
+            SETTLEMENT_REGION_SIZE
+        );
+
+
+    const lastRegionX =
+
+        Math.floor(
+
+            endX /
+            SETTLEMENT_REGION_SIZE
+        );
+
+
+    const firstRegionY =
+
+        Math.floor(
+
+            startY /
+            SETTLEMENT_REGION_SIZE
+        );
+
+
+    const lastRegionY =
+
+        Math.floor(
+
+            endY /
+            SETTLEMENT_REGION_SIZE
+        );
+
+
+    for (
+        let regionY =
+            firstRegionY;
+
+        regionY <=
+            lastRegionY;
+
+        regionY++
+    ) {
+
+        for (
+            let regionX =
+                firstRegionX;
+
+            regionX <=
+                lastRegionX;
+
+            regionX++
+        ) {
+
+            ensureSettlementRegion(
+                regionX,
+                regionY
+            );
+        }
+    }
+
+
+    /*
+        Chunk kan ha blitt unloaded og terrain
+        generert på nytt.
+
+        Reapply derfor settlement marker.
+    */
+
+    for (
+        const settlement
+        of settlements
+    ) {
+
+        const settlementChunkX =
+
+            WORLDGEN.worldToChunk(
+                settlement.x
+            );
+
+
+        const settlementChunkY =
+
+            WORLDGEN.worldToChunk(
+                settlement.y
+            );
+
+
+        if (
+            settlementChunkX !==
+                chunkX ||
+            settlementChunkY !==
+                chunkY
+        ) {
+
+            continue;
+        }
+
+
+        const tile =
+
+            getTile(
+
+                settlement.x,
+                settlement.y
+            );
+
+
+        if (tile) {
+
+            tile.settlementId =
+                settlement.id;
+        }
+    }
+}
+
+/* =========================================================
+   PHYSICAL SETTLEMENT LAYOUT
+========================================================= */
+
+function getSettlementFamilyRecord(
+    settlement,
+    familyId
+) {
+
+    if (
+        !settlement ||
+        !familyId
+    ) {
+
+        return null;
+    }
+
+
+    const activeFamily =
+        getFamilyById(
+            familyId
+        );
+
+
+    if (activeFamily) {
+
+        return activeFamily;
+    }
+
+
+    return (
+
+        settlement.populationArchive
+            ?.families
+            ?.find(
+                family =>
+                    family.id ===
+                    familyId
+            ) ||
+
+        null
+    );
+}
+
+
+/* =========================================================
+   HOUSE GEOMETRY
+========================================================= */
+
+function getSettlementHouseBounds(
+    centerX,
+    centerY
+) {
+
+    const halfWidth =
+
+        Math.floor(
+
+            SETTLEMENT_LAYOUT_RULES
+                .houseWidth /
+            2
+        );
+
+
+    const halfHeight =
+
+        Math.floor(
+
+            SETTLEMENT_LAYOUT_RULES
+                .houseHeight /
+            2
+        );
+
+
+    return {
+
+        left:
+            centerX -
+            halfWidth,
+
+        right:
+            centerX +
+            halfWidth,
+
+        top:
+            centerY -
+            halfHeight,
+
+        bottom:
+            centerY +
+            halfHeight
+    };
+}
+
+
+/* =========================================================
+   HOUSE DOOR
+========================================================= */
+
+function getSettlementHouseDoor(
+    settlement,
+    centerX,
+    centerY
+) {
+
+    const bounds =
+        getSettlementHouseBounds(
+            centerX,
+            centerY
+        );
+
+
+    const dx =
+
+        settlement.x -
+        centerX;
+
+
+    const dy =
+
+        settlement.y -
+        centerY;
+
+
+    /*
+        Door vender mot settlement center.
+
+        Det gjør layouten litt mer naturlig
+        allerede før vi har roads.
+    */
+
+    if (
+        Math.abs(dx) >
+        Math.abs(dy)
+    ) {
+
+        return {
+
+            x:
+
+                dx < 0
+
+                    ? bounds.left
+
+                    : bounds.right,
+
+            y:
+                centerY
+        };
+    }
+
+
+    return {
+
+        x:
+            centerX,
+
+        y:
+
+            dy < 0
+
+                ? bounds.top
+
+                : bounds.bottom
+    };
+}
+
+
+/* =========================================================
+   HOUSE WALL SYMBOL
+========================================================= */
+
+function getSettlementHouseWallChar(
+    bounds,
+    x,
+    y
+) {
+
+    const isLeft =
+        x === bounds.left;
+
+    const isRight =
+        x === bounds.right;
+
+    const isTop =
+        y === bounds.top;
+
+    const isBottom =
+        y === bounds.bottom;
+
+
+    if (
+        isLeft &&
+        isTop
+    ) {
+
+        return "┌";
+    }
+
+
+    if (
+        isRight &&
+        isTop
+    ) {
+
+        return "┐";
+    }
+
+
+    if (
+        isLeft &&
+        isBottom
+    ) {
+
+        return "└";
+    }
+
+
+    if (
+        isRight &&
+        isBottom
+    ) {
+
+        return "┘";
+    }
+
+
+    if (
+        isTop ||
+        isBottom
+    ) {
+
+        return "─";
+    }
+
+
+    return "│";
+}
+
+
+/* =========================================================
+   VALID HOUSE FOOTPRINT
+========================================================= */
+
+function isValidSettlementHouseFootprint(
+    settlement,
+    centerX,
+    centerY
+) {
+
+    if (!settlement) {
+
+        return false;
+    }
+
+
+    const bounds =
+        getSettlementHouseBounds(
+            centerX,
+            centerY
+        );
+
+
+    for (
+        let y = bounds.top;
+        y <= bounds.bottom;
+        y++
+    ) {
+
+        for (
+            let x = bounds.left;
+            x <= bounds.right;
+            x++
+        ) {
+
+            /*
+                Hold settlement center åpent.
+            */
+
+            const centerDistance =
+
+                Math.max(
+
+                    Math.abs(
+                        x -
+                        settlement.x
+                    ),
+
+                    Math.abs(
+                        y -
+                        settlement.y
+                    )
+                );
+
+
+            if (
+                centerDistance <=
+                SETTLEMENT_LAYOUT_RULES
+                    .centerClearRadius
+            ) {
+
+                return false;
+            }
+
+
+            const tile =
+                getTile(
+                    x,
+                    y
+                );
+
+
+            if (!tile) {
+
+                return false;
+            }
+
+
+            /*
+                Houses skal ikke dekke rivers.
+            */
+
+            if (
+                tile.river
+            ) {
+
+                return false;
+            }
+
+
+            /*
+                Foreløpig bygger settlements
+                ikke hus i disse områdene.
+            */
+
+            if (
+                tile.biome === "ocean" ||
+                tile.biome === "mountain" ||
+                tile.biome === "swamp"
+            ) {
+
+                return false;
+            }
+
+
+            /*
+                Vi godtar trees/pines.
+
+                De ryddes automatisk bort når
+                bygningen materialiseres.
+            */
+
+            const validTerrain =
+
+                tile.type === "grass" ||
+                tile.type === "grassDark" ||
+                tile.type === "dryGrass" ||
+                tile.type === "tundra" ||
+                tile.type === "tree" ||
+                tile.type === "pine";
+
+
+            if (!validTerrain) {
+
+                return false;
+            }
+
+        }
+    }
+
+
+    return true;
+}
+
+
+/* =========================================================
+   HOUSE OVERLAP
+========================================================= */
+
+function doSettlementHouseBoundsOverlap(
+    first,
+    second,
+    gap = 0
+) {
+
+    return !(
+
+        first.right +
+            gap <
+            second.left ||
+
+        first.left -
+            gap >
+            second.right ||
+
+        first.bottom +
+            gap <
+            second.top ||
+
+        first.top -
+            gap >
+            second.bottom
+    );
+}
+
+/* =========================================================
+   SETTLEMENT PATH HELPERS
+========================================================= */
+
+function getSettlementHouseOutsideDoorTile(
+    placement
+) {
+
+    const bounds =
+
+        placement.bounds ??
+
+        getSettlementHouseBounds(
+            placement.x,
+            placement.y
+        );
+
+
+    if (
+        placement.doorX ===
+        bounds.left
+    ) {
+
+        return {
+            x:
+                placement.doorX - 1,
+
+            y:
+                placement.doorY
+        };
+    }
+
+
+    if (
+        placement.doorX ===
+        bounds.right
+    ) {
+
+        return {
+            x:
+                placement.doorX + 1,
+
+            y:
+                placement.doorY
+        };
+    }
+
+
+    if (
+        placement.doorY ===
+        bounds.top
+    ) {
+
+        return {
+            x:
+                placement.doorX,
+
+            y:
+                placement.doorY - 1
+        };
+    }
+
+
+    return {
+        x:
+            placement.doorX,
+
+        y:
+            placement.doorY + 1
+    };
+}
+
+
+/* =========================================================
+   HOUSE OCCUPANCY
+========================================================= */
+
+function isInsideSettlementHouse(
+    placements,
+    x,
+    y
+) {
+
+    return placements.some(
+        placement => {
+
+            const bounds =
+
+                placement.bounds ??
+
+                getSettlementHouseBounds(
+                    placement.x,
+                    placement.y
+                );
+
+
+            return (
+                x >= bounds.left &&
+                x <= bounds.right &&
+                y >= bounds.top &&
+                y <= bounds.bottom
+            );
+        }
+    );
+}
+
+
+/* =========================================================
+   VALID PATH TILE
+========================================================= */
+
+function canSettlementPathUseTile(
+    settlement,
+    placements,
+    x,
+    y
+) {
+
+    const searchRadius =
+
+        SETTLEMENT_LAYOUT_RULES
+            .layoutRadius +
+
+        SETTLEMENT_LAYOUT_RULES
+            .pathSearchMargin;
+
+
+    if (
+        Math.abs(
+            x -
+            settlement.x
+        ) >
+            searchRadius ||
+
+        Math.abs(
+            y -
+            settlement.y
+        ) >
+            searchRadius
+    ) {
+
+        return false;
+    }
+
+
+    /*
+        Paths skal aldri gå gjennom houses.
+    */
+
+    if (
+        isInsideSettlementHouse(
+            placements,
+            x,
+            y
+        )
+    ) {
+
+        return false;
+    }
+
+
+    /*
+        Settlement paths skal heller ikke
+        skjære tvers gjennom cultivated fields.
+    */
+
+    const insideFarmField =
+
+        (
+            settlement.workplacePlacements ??
+            []
+        ).some(
+            placement => {
+
+                const bounds =
+                    placement.farmFieldBounds;
+
+
+                if (!bounds) {
+
+                    return false;
+                }
+
+
+                return (
+
+                    x >= bounds.left &&
+                    x <= bounds.right &&
+
+                    y >= bounds.top &&
+                    y <= bounds.bottom
+                );
+            }
+        );
+
+
+    if (insideFarmField) {
+
+        return false;
+    }
+
+
+    const tile =
+        getTile(
+            x,
+            y
+        );
+
+
+    if (
+        !tile ||
+        tile.river
+    ) {
+
+        return false;
+    }
+
+
+    /*
+        Foreløpig bygger vi ikke bridges.
+    */
+
+    if (
+        tile.type ===
+            "deepWater" ||
+
+        tile.type ===
+            "shallowWater" ||
+
+        tile.type ===
+            "mountain"
+    ) {
+
+        return false;
+    }
+
+
+    return true;
+}
+
+
+/* =========================================================
+   PATH DIRECTION PRIORITY
+========================================================= */
+
+function getSettlementPathDirections(
+    x,
+    y,
+    settlement
+) {
+
+    const directions = [
+
+        { x:  0, y: -1 },
+        { x:  1, y:  0 },
+        { x:  0, y:  1 },
+        { x: -1, y:  0 }
+    ];
+
+
+    /*
+        Foretrekk steg som går i retning
+        av settlement center.
+
+        Noise brukes kun til deterministic
+        tie-breaking.
+    */
+
+    directions.sort(
+        (
+            a,
+            b
+        ) => {
+
+            const aDistance =
+
+                Math.abs(
+
+                    settlement.x -
+                    (
+                        x +
+                        a.x
+                    )
+                ) +
+
+                Math.abs(
+
+                    settlement.y -
+                    (
+                        y +
+                        a.y
+                    )
+                );
+
+
+            const bDistance =
+
+                Math.abs(
+
+                    settlement.x -
+                    (
+                        x +
+                        b.x
+                    )
+                ) +
+
+                Math.abs(
+
+                    settlement.y -
+                    (
+                        y +
+                        b.y
+                    )
+                );
+
+
+            if (
+                aDistance !==
+                bDistance
+            ) {
+
+                return (
+
+                    aDistance -
+                    bDistance
+                );
+            }
+
+
+            const aNoise =
+
+                WORLDGEN.hashNoise(
+
+                    x + a.x,
+                    y + a.y,
+
+                    WORLD_SEED +
+                        86200
+                );
+
+
+            const bNoise =
+
+                WORLDGEN.hashNoise(
+
+                    x + b.x,
+                    y + b.y,
+
+                    WORLD_SEED +
+                        86200
+                );
+
+
+            return (
+
+                aNoise -
+                bNoise
+            );
+        }
+    );
+
+
+    return directions;
+}
+
+
+/* =========================================================
+   FIND PATH TO ROAD NETWORK
+========================================================= */
+
+function findSettlementPathToNetwork(
+    settlement,
+    placements,
+    start,
+    network
+) {
+
+    const startKey =
+        `${start.x},${start.y}`;
+
+
+    /*
+        Allerede koblet på.
+    */
+
+    if (
+        network.has(
+            startKey
+        )
+    ) {
+
+        return [
+            {
+                x:
+                    start.x,
+
+                y:
+                    start.y
+            }
+        ];
+    }
+
+
+    if (
+        !canSettlementPathUseTile(
+
+            settlement,
+            placements,
+
+            start.x,
+            start.y
+        )
+    ) {
+
+        return [];
+    }
+
+
+    /*
+        Enkel BFS.
+
+        Settlement-området er lite nok til at
+        dette er billig, og det garanterer at
+        vi finner en rute rundt houses.
+    */
+
+    const queue = [
+
+        {
+            x:
+                start.x,
+
+            y:
+                start.y
+        }
+    ];
+
+
+    let queueIndex =
+        0;
+
+
+    const cameFrom =
+        new Map();
+
+
+    cameFrom.set(
+        startKey,
+        null
+    );
+
+
+    let endKey =
+        null;
+
+
+    while (
+        queueIndex <
+        queue.length
+    ) {
+
+        const current =
+            queue[
+                queueIndex++
+            ];
+
+
+        const currentKey =
+            `${current.x},${current.y}`;
+
+
+        const directions =
+
+            getSettlementPathDirections(
+
+                current.x,
+                current.y,
+
+                settlement
+            );
+
+
+        for (
+            const direction
+            of directions
+        ) {
+
+            const nextX =
+
+                current.x +
+                direction.x;
+
+
+            const nextY =
+
+                current.y +
+                direction.y;
+
+
+            const nextKey =
+                `${nextX},${nextY}`;
+
+
+            if (
+                cameFrom.has(
+                    nextKey
+                )
+            ) {
+
+                continue;
+            }
+
+
+            /*
+                Hvis vi treffer eksisterende road,
+                er huset koblet til nettverket.
+            */
+
+            if (
+                network.has(
+                    nextKey
+                )
+            ) {
+
+                cameFrom.set(
+                    nextKey,
+                    currentKey
+                );
+
+
+                endKey =
+                    nextKey;
+
+
+                queueIndex =
+                    queue.length;
+
+
+                break;
+            }
+
+
+            if (
+                !canSettlementPathUseTile(
+
+                    settlement,
+                    placements,
+
+                    nextX,
+                    nextY
+                )
+            ) {
+
+                continue;
+            }
+
+
+            cameFrom.set(
+                nextKey,
+                currentKey
+            );
+
+
+            queue.push({
+
+                x:
+                    nextX,
+
+                y:
+                    nextY
+            });
+        }
+    }
+
+
+    if (!endKey) {
+
+        return [];
+    }
+
+
+    /*
+        Rekonstruer path baklengs.
+    */
+
+    const path =
+        [];
+
+
+    let currentKey =
+        endKey;
+
+
+    while (
+        currentKey !==
+        null
+    ) {
+
+        const [
+            x,
+            y
+        ] =
+
+            currentKey
+
+                .split(",")
+
+                .map(
+                    Number
+                );
+
+
+        path.push({
+            x,
+            y
+        });
+
+
+        currentKey =
+
+            cameFrom.get(
+                currentKey
+            ) ??
+
+            null;
+    }
+
+
+    path.reverse();
+
+
+    return path;
+}
+
+
+/* =========================================================
+   GENERATE COMPLETE ROAD NETWORK
+========================================================= */
+
+function generateSettlementPathNetwork(
+    settlement,
+    placements
+) {
+
+    const network =
+        new Map();
+
+
+    /*
+        Hele veinettet begynner ved H.
+    */
+
+    const centerKey =
+        `${settlement.x},${settlement.y}`;
+
+
+    network.set(
+
+        centerKey,
+
+        {
+            x:
+                settlement.x,
+
+            y:
+                settlement.y
+        }
+    );
+
+
+    /*
+        Ett hus om gangen kobles inn.
+
+        Etter første hus kan senere houses
+        koble seg inn på eksisterende paths.
+    */
+
+    for (
+        const placement
+        of placements
+    ) {
+
+        const start =
+
+            getSettlementHouseOutsideDoorTile(
+                placement
+            );
+
+
+        const path =
+
+            findSettlementPathToNetwork(
+
+                settlement,
+                placements,
+
+                start,
+
+                network
+            );
+
+
+        if (
+            path.length ===
+            0
+        ) {
+
+            console.warn(
+
+                `${settlement.name}: could not connect building ${placement.id} to settlement paths.`
+            );
+
+
+            continue;
+        }
+
+
+        for (
+            const point
+            of path
+        ) {
+
+            const key =
+                `${point.x},${point.y}`;
+
+
+            if (
+                network.has(
+                    key
+                )
+            ) {
+
+                continue;
+            }
+
+
+            network.set(
+                key,
+                point
+            );
+        }
+    }
+
+
+    return Array.from(
+        network.values()
+    );
+}
+
+/* =========================================================
+   SETTLEMENT WORKPLACES
+========================================================= */
+
+function getSettlementWorkplaceDefinition(
+    professionId
+) {
+
+    return (
+        SETTLEMENT_WORKPLACE_TYPES[
+            professionId
+        ] ??
+        null
+    );
+}
+
+
+function getRequiredSettlementWorkplaceProfessions(
+    settlement
+) {
+
+    if (!settlement) {
+
+        return [];
+    }
+
+
+    return Object.keys(
+        SETTLEMENT_WORKPLACE_TYPES
+    ).filter(
+        professionId =>
+
+            getSettlementWorkers(
+
+                settlement,
+
+                professionId
+            ).length > 0
+    );
+}
+
+
+function getPersonWorkplacePlacement(
+    person,
+    settlement = null
+) {
+
+    if (
+        !person ||
+        !person.profession
+    ) {
+
+        return null;
+    }
+
+
+    settlement =
+
+        settlement ??
+
+        getSettlementById(
+            person.settlementId
+        );
+
+
+    if (!settlement) {
+
+        return null;
+    }
+
+
+    return (
+
+        (
+            settlement.workplacePlacements ??
+            []
+        ).find(
+            placement =>
+
+                (
+                    person.workplaceId &&
+                    placement.id ===
+                        person.workplaceId
+                ) ||
+
+                (
+                    !person.workplaceId &&
+                    placement.professionId ===
+                        person.profession
+                )
+        ) ||
+
+        null
+    );
+}
+
+
+function assignSettlementWorkersToWorkplace(
+    settlement,
+    placement
+) {
+
+    if (
+        !settlement ||
+        !placement
+    ) {
+
+        return;
+    }
+
+
+    const workers =
+
+        getSettlementWorkers(
+
+            settlement,
+
+            placement.professionId
+        );
+
+
+    const interiorTiles =
+
+        getSettlementHouseInteriorTiles(
+            placement
+        );
+
+
+    for (
+        let index = 0;
+        index < workers.length;
+        index++
+    ) {
+
+        const worker =
+            workers[index];
+
+
+        const interior =
+
+            interiorTiles.length > 0
+
+                ? interiorTiles[
+                    index %
+                    interiorTiles.length
+                ]
+
+                : {
+                    x:
+                        placement.x,
+
+                    y:
+                        placement.y
+                };
+
+
+        worker.workplaceId =
+            placement.id;
+
+        worker.workplaceProfessionId =
+            placement.professionId;
+
+        worker.workInteriorX =
+            interior.x;
+
+        worker.workInteriorY =
+            interior.y;
+    }
+}
+
+
+function generateSettlementWorkplacePlacements(
+    settlement,
+    candidates,
+    housePlacements
+) {
+
+    const workplaces =
+        [];
+
+
+    const professionIds =
+
+        getRequiredSettlementWorkplaceProfessions(
+            settlement
+        );
+
+
+    for (
+        let professionIndex = 0;
+        professionIndex <
+            professionIds.length;
+        professionIndex++
+    ) {
+
+        const professionId =
+            professionIds[
+                professionIndex
+            ];
+
+
+        const definition =
+
+            getSettlementWorkplaceDefinition(
+                professionId
+            );
+
+
+        if (!definition) {
+
+            continue;
+        }
+
+
+        const professionCandidates =
+
+            candidates
+
+                .map(
+                    candidate => ({
+
+                        ...candidate,
+
+                        workplacePriority:
+
+                            candidate.priority +
+
+                            WORLDGEN.hashNoise(
+
+                                candidate.x,
+                                candidate.y,
+
+                                WORLD_SEED +
+                                    87000 +
+                                    professionIndex *
+                                    101
+                            ) *
+
+                            5
+                    })
+                )
+
+                .sort(
+                    (
+                        a,
+                        b
+                    ) =>
+
+                        a.workplacePriority -
+                        b.workplacePriority
+                );
+
+
+        let chosen =
+            null;
+
+
+        for (
+            const gap
+            of [
+                SETTLEMENT_LAYOUT_RULES
+                    .houseGap,
+                0
+            ]
+        ) {
+
+            for (
+                const candidate
+                of professionCandidates
+            ) {
+
+                const bounds =
+
+                    getSettlementHouseBounds(
+
+                        candidate.x,
+                        candidate.y
+                    );
+
+
+                const occupied = [
+
+                    ...housePlacements,
+                    ...workplaces
+                ];
+
+
+                const overlaps =
+
+                    occupied.some(
+                        placement =>
+
+                            doSettlementHouseBoundsOverlap(
+
+                                placement.bounds,
+
+                                bounds,
+
+                                gap
+                            )
+                    );
+
+
+                if (overlaps) {
+
+                    continue;
+                }
+
+
+                const door =
+
+                    getSettlementHouseDoor(
+
+                        settlement,
+
+                        candidate.x,
+                        candidate.y
+                    );
+
+
+                chosen = {
+
+                    id:
+
+                        `settlement_workplace_${settlement.id}_${professionId}`,
+
+                    type:
+                        "settlement_workplace",
+
+                    professionId,
+
+                    name:
+                        definition.name,
+
+                    signChar:
+                        definition.signChar,
+
+                    x:
+                        candidate.x,
+
+                    y:
+                        candidate.y,
+
+                    width:
+
+                        SETTLEMENT_LAYOUT_RULES
+                            .houseWidth,
+
+                    height:
+
+                        SETTLEMENT_LAYOUT_RULES
+                            .houseHeight,
+
+                    bounds,
+
+                    doorX:
+                        door.x,
+
+                    doorY:
+                        door.y,
+
+                    settlementId:
+                        settlement.id
+                };
+
+
+                break;
+            }
+
+
+            if (chosen) {
+
+                break;
+            }
+        }
+
+
+        if (!chosen) {
+
+            console.warn(
+
+                `${settlement.name}: could not place workplace for ${professionId}.`
+            );
+
+
+            continue;
+        }
+
+
+    workplaces.push(
+        chosen
+    );
+
+
+    assignSettlementWorkersToWorkplace(
+
+        settlement,
+
+        chosen
+    );
+    }
+
+
+    /*
+        Nå som ALLE buildings har fått sine
+        positions, kan farmen finne et område
+        som ikke kolliderer med andre buildings.
+    */
+
+    const occupiedPlacements = [
+
+        ...housePlacements,
+        ...workplaces
+    ];
+
+
+    for (
+        const workplace
+        of workplaces
+    ) {
+
+        if (
+            workplace.professionId !==
+            "farmer"
+        ) {
+
+            continue;
+        }
+
+
+        generateFarmFieldForWorkplace(
+
+            settlement,
+
+            workplace,
+
+            occupiedPlacements
+        );
+
+
+        assignFarmersToField(
+
+            settlement,
+
+            workplace
+        );
+    }
+
+
+    return workplaces;
+}
+
+/* =========================================================
+   PHYSICAL FARM FIELD
+========================================================= */
+
+function getFarmFieldSideOrder(
+    workplace
+) {
+
+    const bounds =
+
+        workplace.bounds ??
+
+        getSettlementHouseBounds(
+            workplace.x,
+            workplace.y
+        );
+
+
+    let frontSide =
+        "top";
+
+    let preferredSide =
+        "bottom";
+
+
+    /*
+        Vi foretrekker field på motsatt side
+        av inngangen mot settlementet.
+    */
+
+    if (
+        workplace.doorX ===
+        bounds.left
+    ) {
+
+        frontSide =
+            "left";
+
+        preferredSide =
+            "right";
+
+    } else if (
+        workplace.doorX ===
+        bounds.right
+    ) {
+
+        frontSide =
+            "right";
+
+        preferredSide =
+            "left";
+
+    } else if (
+        workplace.doorY ===
+        bounds.top
+    ) {
+
+        frontSide =
+            "top";
+
+        preferredSide =
+            "bottom";
+
+    } else if (
+        workplace.doorY ===
+        bounds.bottom
+    ) {
+
+        frontSide =
+            "bottom";
+
+        preferredSide =
+            "top";
+    }
+
+
+    const allSides = [
+
+        "top",
+        "right",
+        "bottom",
+        "left"
+    ];
+
+
+    /*
+        Vi bruker aldri samme side som
+        hovedinngangen til field.
+    */
+
+    return [
+
+        preferredSide,
+
+        ...allSides.filter(
+            side =>
+
+                side !==
+                    preferredSide &&
+
+                side !==
+                    frontSide
+        )
+    ];
+}
+
+
+function createFarmFieldCandidate(
+    workplace,
+    side,
+    width,
+    height
+) {
+
+    const buildingBounds =
+
+        workplace.bounds ??
+
+        getSettlementHouseBounds(
+            workplace.x,
+            workplace.y
+        );
+
+
+    const halfWidth =
+
+        Math.floor(
+            width / 2
+        );
+
+
+    const halfHeight =
+
+        Math.floor(
+            height / 2
+        );
+
+
+    let bounds;
+
+    let fieldDoorX;
+    let fieldDoorY;
+
+
+    /*
+        RIGHT SIDE
+    */
+
+    if (
+        side ===
+        "right"
+    ) {
+
+        bounds = {
+
+            left:
+
+                buildingBounds.right +
+
+                SETTLEMENT_FARM_RULES
+                    .buildingGap +
+
+                1,
+
+            right:
+
+                buildingBounds.right +
+
+                SETTLEMENT_FARM_RULES
+                    .buildingGap +
+
+                width,
+
+            top:
+
+                workplace.y -
+                halfHeight,
+
+            bottom:
+
+                workplace.y -
+                halfHeight +
+                height -
+                1
+        };
+
+
+        fieldDoorX =
+            buildingBounds.right;
+
+        fieldDoorY =
+            workplace.y;
+
+
+    /*
+        LEFT SIDE
+    */
+
+    } else if (
+        side ===
+        "left"
+    ) {
+
+        bounds = {
+
+            right:
+
+                buildingBounds.left -
+
+                SETTLEMENT_FARM_RULES
+                    .buildingGap -
+
+                1,
+
+            left:
+
+                buildingBounds.left -
+
+                SETTLEMENT_FARM_RULES
+                    .buildingGap -
+
+                width,
+
+            top:
+
+                workplace.y -
+                halfHeight,
+
+            bottom:
+
+                workplace.y -
+                halfHeight +
+                height -
+                1
+        };
+
+
+        fieldDoorX =
+            buildingBounds.left;
+
+        fieldDoorY =
+            workplace.y;
+
+
+    /*
+        TOP SIDE
+    */
+
+    } else if (
+        side ===
+        "top"
+    ) {
+
+        bounds = {
+
+            left:
+
+                workplace.x -
+                halfWidth,
+
+            right:
+
+                workplace.x -
+                halfWidth +
+                width -
+                1,
+
+            bottom:
+
+                buildingBounds.top -
+
+                SETTLEMENT_FARM_RULES
+                    .buildingGap -
+
+                1,
+
+            top:
+
+                buildingBounds.top -
+
+                SETTLEMENT_FARM_RULES
+                    .buildingGap -
+
+                height
+        };
+
+
+        fieldDoorX =
+            workplace.x;
+
+        fieldDoorY =
+            buildingBounds.top;
+
+
+    /*
+        BOTTOM SIDE
+    */
+
+    } else {
+
+        bounds = {
+
+            left:
+
+                workplace.x -
+                halfWidth,
+
+            right:
+
+                workplace.x -
+                halfWidth +
+                width -
+                1,
+
+            top:
+
+                buildingBounds.bottom +
+
+                SETTLEMENT_FARM_RULES
+                    .buildingGap +
+
+                1,
+
+            bottom:
+
+                buildingBounds.bottom +
+
+                SETTLEMENT_FARM_RULES
+                    .buildingGap +
+
+                height
+        };
+
+
+        fieldDoorX =
+            workplace.x;
+
+        fieldDoorY =
+            buildingBounds.bottom;
+    }
+
+
+    return {
+
+        side,
+
+        bounds,
+
+        fieldDoorX,
+        fieldDoorY
+    };
+}
+
+
+/* =========================================================
+   VALIDATE FIELD
+========================================================= */
+
+function isValidFarmFieldCandidate(
+    settlement,
+    workplace,
+    candidate,
+    occupiedPlacements
+) {
+
+    if (
+        !settlement ||
+        !workplace ||
+        !candidate
+    ) {
+
+        return false;
+    }
+
+
+    const bounds =
+        candidate.bounds;
+
+
+    /*
+        Field kan ligge inntil selve Farmstead,
+        men skal holde litt avstand fra
+        andre houses/workplaces.
+    */
+
+    for (
+        const placement
+        of occupiedPlacements
+    ) {
+
+        const requiredGap =
+
+            placement.id ===
+            workplace.id
+
+                ? 0
+
+                : 1;
+
+
+        if (
+            doSettlementHouseBoundsOverlap(
+
+                placement.bounds,
+
+                bounds,
+
+                requiredGap
+            )
+        ) {
+
+            return false;
+        }
+    }
+
+
+    const validTerrainTypes =
+
+        new Set([
+
+            "grass",
+            "grassDark",
+            "dryGrass",
+            "tundra",
+            "tree",
+            "pine"
+        ]);
+
+
+    for (
+        let y = bounds.top;
+        y <= bounds.bottom;
+        y++
+    ) {
+
+        for (
+            let x = bounds.left;
+            x <= bounds.right;
+            x++
+        ) {
+
+            /*
+                Ikke legg field oppå selve
+                settlement center.
+            */
+
+            const centerDistance =
+
+                Math.max(
+
+                    Math.abs(
+                        x -
+                        settlement.x
+                    ),
+
+                    Math.abs(
+                        y -
+                        settlement.y
+                    )
+                );
+
+
+            if (
+                centerDistance <=
+                SETTLEMENT_LAYOUT_RULES
+                    .centerClearRadius
+            ) {
+
+                return false;
+            }
+
+
+            const tile =
+
+                getTile(
+                    x,
+                    y
+                );
+
+
+            if (
+                !tile ||
+                tile.river ||
+
+                !validTerrainTypes.has(
+                    tile.type
+                )
+            ) {
+
+                return false;
+            }
+        }
+    }
+
+
+    return true;
+}
+
+
+/* =========================================================
+   CREATE FIELD
+========================================================= */
+
+function generateFarmFieldForWorkplace(
+    settlement,
+    workplace,
+    occupiedPlacements
+) {
+
+    if (
+        !settlement ||
+        !workplace ||
+
+        workplace.professionId !==
+            "farmer"
+    ) {
+
+        return false;
+    }
+
+
+    /*
+        Stor field først.
+
+        Deretter prøver vi mindre field
+        dersom terrain eller buildings
+        står i veien.
+    */
+
+    for (
+        const size
+        of SETTLEMENT_FARM_RULES
+            .fieldSizes
+    ) {
+
+        for (
+            const side
+            of getFarmFieldSideOrder(
+                workplace
+            )
+        ) {
+
+            const candidate =
+
+                createFarmFieldCandidate(
+
+                    workplace,
+
+                    side,
+
+                    size.width,
+                    size.height
+                );
+
+
+            if (
+                !isValidFarmFieldCandidate(
+
+                    settlement,
+
+                    workplace,
+
+                    candidate,
+
+                    occupiedPlacements
+                )
+            ) {
+
+                continue;
+            }
+
+
+            workplace.farmFieldBounds =
+                candidate.bounds;
+
+            workplace.fieldDoorX =
+                candidate.fieldDoorX;
+
+            workplace.fieldDoorY =
+                candidate.fieldDoorY;
+
+            workplace.farmFieldSide =
+                candidate.side;
+
+
+            return true;
+        }
+    }
+
+
+    /*
+        Fallback:
+
+        Farmstead fungerer fortsatt,
+        men farmerne jobber inne dersom
+        vi virkelig ikke finner plass.
+    */
+
+    console.warn(
+
+        `${settlement.name}: could not place farm field.`
+    );
+
+
+    return false;
+}
+
+
+/* =========================================================
+   FARM FIELD TILES
+========================================================= */
+
+function getFarmFieldTiles(
+    workplace
+) {
+
+    const bounds =
+        workplace
+            ?.farmFieldBounds;
+
+
+    if (!bounds) {
+
+        return [];
+    }
+
+
+    const tiles =
+        [];
+
+
+    for (
+        let y = bounds.top;
+        y <= bounds.bottom;
+        y++
+    ) {
+
+        for (
+            let x = bounds.left;
+            x <= bounds.right;
+            x++
+        ) {
+
+            tiles.push({
+                x,
+                y
+            });
+        }
+    }
+
+
+    return tiles;
+}
+
+
+/* =========================================================
+   ASSIGN FARMERS TO FIELD
+========================================================= */
+
+function assignFarmersToField(
+    settlement,
+    workplace
+) {
+
+    if (
+        !settlement ||
+        !workplace ||
+        !workplace.farmFieldBounds
+    ) {
+
+        return;
+    }
+
+
+    const farmers =
+
+        getSettlementWorkers(
+
+            settlement,
+
+            "farmer"
+        );
+
+
+    const fieldTiles =
+
+        getFarmFieldTiles(
+            workplace
+        );
+
+
+    if (
+        fieldTiles.length ===
+        0
+    ) {
+
+        return;
+    }
+
+
+    /*
+        Spre farmers utover field i stedet
+        for å gi alle samme target.
+    */
+
+    for (
+        let index = 0;
+        index < farmers.length;
+        index++
+    ) {
+
+        const farmer =
+            farmers[index];
+
+
+        const tileIndex =
+
+            (
+                index * 13 +
+                3
+            ) %
+
+            fieldTiles.length;
+
+
+        farmer.workFieldX =
+
+            fieldTiles[
+                tileIndex
+            ].x;
+
+
+        farmer.workFieldY =
+
+            fieldTiles[
+                tileIndex
+            ].y;
+    }
+}
+
+
+function isPersonInsideFarmField(
+    person,
+    workplace
+) {
+
+    const bounds =
+        workplace
+            ?.farmFieldBounds;
+
+
+    if (
+        !person ||
+        !bounds
+    ) {
+
+        return false;
+    }
+
+
+    return (
+
+        person.worldX >=
+            bounds.left &&
+
+        person.worldX <=
+            bounds.right &&
+
+        person.worldY >=
+            bounds.top &&
+
+        person.worldY <=
+            bounds.bottom
+    );
+}
+
+/* =========================================================
+   PHYSICAL SETTLEMENT NPCS
+========================================================= */
+
+function isSettlementPhysicalNpcActive(
+    settlement
+) {
+
+    return (
+
+        settlement &&
+
+        settlement.populationLoaded !==
+            false &&
+
+        getSettlementDistanceFromPlayer(
+            settlement
+        ) <=
+        CIVILIZATION_SIMULATION_RULES
+            .physicalNpcRadius
+    );
+}
+
+
+/* =========================================================
+   FIND PHYSICAL PERSON
+========================================================= */
+
+function getPhysicalPeopleAt(
+    x,
+    y,
+    excludePersonId = null
+) {
+
+    return people.filter(
+        person => {
+
+            if (
+                !person.alive ||
+
+                person.id ===
+                    excludePersonId ||
+
+                person.physicalInitialized !==
+                    true ||
+
+                !Number.isInteger(
+                    person.worldX
+                ) ||
+
+                !Number.isInteger(
+                    person.worldY
+                ) ||
+
+                person.worldX !== x ||
+
+                person.worldY !== y
+            ) {
+
+                return false;
+            }
+
+
+            const settlement =
+                getSettlementById(
+                    person.settlementId
+                );
+
+
+            return (
+                isSettlementPhysicalNpcActive(
+                    settlement
+                )
+            );
+        }
+    );
+}
+
+
+function getPhysicalPersonAt(
+    x,
+    y,
+    excludePersonId = null
+) {
+
+    return (
+
+        getPhysicalPeopleAt(
+            x,
+            y,
+            excludePersonId
+        )[0] ??
+
+        null
+    );
+}
+
+
+function isPhysicalPersonTileCrowded(
+    person,
+    x,
+    y
+) {
+
+    /*
+        Player teller som crowding,
+        men blokkerer ikke.
+    */
+
+    if (
+        player.x === x &&
+        player.y === y
+    ) {
+
+        return true;
+    }
+
+
+    return (
+
+        getPhysicalPeopleAt(
+
+            x,
+            y,
+
+            person?.id ??
+                null
+
+        ).length > 0
+    );
+}
+
+
+/* =========================================================
+   PERSON -> HOUSE
+========================================================= */
+
+function getPersonHousePlacement(
+    person,
+    settlement = null
+) {
+
+    if (!person) {
+
+        return null;
+    }
+
+
+    settlement =
+
+        settlement ??
+
+        getSettlementById(
+            person.settlementId
+        );
+
+
+    if (!settlement) {
+
+        return null;
+    }
+
+
+    return (
+
+        (
+            settlement.housePlacements ??
+            []
+        ).find(
+            placement =>
+
+                placement.familyId ===
+                person.familyId
+        ) ||
+
+        null
+    );
+}
+
+
+/* =========================================================
+   HOUSE INTERIOR TILES
+========================================================= */
+
+function getSettlementHouseInteriorTiles(
+    placement
+) {
+
+    if (!placement) {
+
+        return [];
+    }
+
+
+    const bounds =
+
+        placement.bounds ??
+
+        getSettlementHouseBounds(
+            placement.x,
+            placement.y
+        );
+
+
+    const tiles =
+        [];
+
+
+    for (
+        let y =
+            bounds.top + 1;
+
+        y <=
+            bounds.bottom - 1;
+
+        y++
+    ) {
+
+        for (
+            let x =
+                bounds.left + 1;
+
+            x <=
+                bounds.right - 1;
+
+            x++
+        ) {
+
+            tiles.push({
+                x,
+                y
+            });
+        }
+    }
+
+
+    return tiles;
+}
+
+
+/* =========================================================
+   INITIAL NPC POSITION
+========================================================= */
+
+function initializePersonPhysicalPosition(
+    person,
+    settlement
+) {
+
+    if (
+        !person ||
+        !person.alive ||
+        !settlement
+    ) {
+
+        return false;
+    }
+
+
+    if (
+        person.physicalInitialized ===
+            true &&
+
+        Number.isInteger(
+            person.worldX
+        ) &&
+
+        Number.isInteger(
+            person.worldY
+        )
+    ) {
+
+        return true;
+    }
+
+
+    const placement =
+
+        getPersonHousePlacement(
+            person,
+            settlement
+        );
+
+
+    if (!placement) {
+
+        return false;
+    }
+
+
+    const interiorTiles =
+
+        getSettlementHouseInteriorTiles(
+            placement
+        );
+
+
+    if (
+        interiorTiles.length ===
+        0
+    ) {
+
+        return false;
+    }
+
+
+    const family =
+        getFamilyById(
+            person.familyId
+        );
+
+
+    let preferredIndex =
+
+        family
+            ?.memberIds
+            ?.indexOf(
+                person.id
+            ) ??
+
+        -1;
+
+
+    if (
+        preferredIndex < 0
+    ) {
+
+        preferredIndex =
+            0;
+    }
+
+
+    let chosen =
+        null;
+
+
+    /*
+        Forsøk å gi hvert family member
+        sin egen interior tile.
+    */
+
+    for (
+        let offset = 0;
+
+        offset <
+            interiorTiles.length;
+
+        offset++
+    ) {
+
+        const candidate =
+
+            interiorTiles[
+                (
+                    preferredIndex +
+                    offset
+                ) %
+                interiorTiles.length
+            ];
+
+
+        const occupied =
+
+            people.some(
+                other =>
+
+                    other.id !==
+                        person.id &&
+
+                    other.alive &&
+
+                    other.physicalInitialized ===
+                        true &&
+
+                    other.worldX ===
+                        candidate.x &&
+
+                    other.worldY ===
+                        candidate.y
+            );
+
+
+        if (
+            occupied
+        ) {
+
+            continue;
+        }
+
+
+        if (
+            player.x ===
+                candidate.x &&
+
+            player.y ===
+                candidate.y
+        ) {
+
+            continue;
+        }
+
+
+        if (
+            getCreatureAt(
+                candidate.x,
+                candidate.y
+            )
+        ) {
+
+            continue;
+        }
+
+
+        chosen =
+            candidate;
+
+        break;
+    }
+
+
+    /*
+        Safety fallback.
+    */
+
+    chosen =
+
+        chosen ??
+
+        interiorTiles[
+            preferredIndex %
+            interiorTiles.length
+        ];
+
+
+    person.worldX =
+        chosen.x;
+
+    person.worldY =
+        chosen.y;
+
+
+    /*
+        Hver person får også sin egen
+        preferred position inne i huset.
+    */
+
+    person.homeInteriorX =
+        chosen.x;
+
+    person.homeInteriorY =
+        chosen.y;
+
+
+    person.npcPreviousX =
+        null;
+
+    person.npcPreviousY =
+        null;
+
+
+    person.physicalInitialized =
+        true;
+
+
+    return true;
+}
+
+
+/* =========================================================
+   SYNC NEARBY PHYSICAL NPCS
+========================================================= */
+
+function syncPhysicalSettlementNpcs() {
+
+    for (
+        const settlement
+        of settlements
+    ) {
+
+        if (
+            !isSettlementPhysicalNpcActive(
+                settlement
+            )
+        ) {
+
+            continue;
+        }
+
+
+        ensureSettlementLayout(
+            settlement
+        );
+
+
+        for (
+            const person
+            of people
+        ) {
+
+            if (
+                !person.alive ||
+
+                person.settlementId !==
+                    settlement.id
+            ) {
+
+                continue;
+            }
+
+
+            initializePersonPhysicalPosition(
+                person,
+                settlement
+            );
+        }
+    }
+}
+
+
+/* =========================================================
+   HOUSE POSITION CHECK
+========================================================= */
+
+function isPersonInsideHouseInterior(
+    person,
+    placement
+) {
+
+    if (
+        !person ||
+        !placement
+    ) {
+
+        return false;
+    }
+
+
+    const bounds =
+
+        placement.bounds ??
+
+        getSettlementHouseBounds(
+            placement.x,
+            placement.y
+        );
+
+
+    return (
+
+        person.worldX >
+            bounds.left &&
+
+        person.worldX <
+            bounds.right &&
+
+        person.worldY >
+            bounds.top &&
+
+        person.worldY <
+            bounds.bottom
+    );
+}
+
+
+/* =========================================================
+   NPC MOVEMENT COLLISION
+========================================================= */
+
+function canPhysicalPersonMoveTo(
+    person,
+    x,
+    y
+) {
+
+    if (
+        !person ||
+        !isWalkable(
+            x,
+            y
+        )
+    ) {
+
+        return false;
+    }
+
+
+    /*
+        NPC-er får dele tile med andre NPC-er
+        og med spilleren.
+
+        Dette hindrer kø/deadlock ved doors
+        og smale settlement paths.
+
+        Creatures blokkerer fortsatt.
+    */
+
+    if (
+        getCreatureAt(
+            x,
+            y
+        )
+    ) {
+
+        return false;
+    }
+
+
+    return true;
+}
+
+
+function movePhysicalPerson(
+    person,
+    x,
+    y
+) {
+
+    if (
+        !canPhysicalPersonMoveTo(
+            person,
+            x,
+            y
+        )
+    ) {
+
+        return false;
+    }
+
+
+    person.npcPreviousX =
+        person.worldX;
+
+    person.npcPreviousY =
+        person.worldY;
+
+
+    person.worldX =
+        x;
+
+    person.worldY =
+        y;
+
+
+    return true;
+}
+
+
+/* =========================================================
+   SIMPLE MOVEMENT TOWARD TILE
+========================================================= */
+
+function movePhysicalPersonTowardTile(
+    person,
+    targetX,
+    targetY
+) {
+
+    const dx =
+        targetX -
+        person.worldX;
+
+    const dy =
+        targetY -
+        person.worldY;
+
+
+    if (
+        dx === 0 &&
+        dy === 0
+    ) {
+
+        return false;
+    }
+
+
+    const xStep =
+
+        dx === 0
+
+            ? null
+
+            : {
+                x:
+                    person.worldX +
+                    Math.sign(dx),
+
+                y:
+                    person.worldY
+            };
+
+
+    const yStep =
+
+        dy === 0
+
+            ? null
+
+            : {
+                x:
+                    person.worldX,
+
+                y:
+                    person.worldY +
+                    Math.sign(dy)
+            };
+
+
+    const candidates =
+
+        Math.abs(dx) >=
+        Math.abs(dy)
+
+            ? [
+                xStep,
+                yStep
+            ]
+
+            : [
+                yStep,
+                xStep
+            ];
+
+
+    const walkableCandidates =
+
+        candidates.filter(
+            candidate =>
+
+                candidate &&
+
+                canPhysicalPersonMoveTo(
+
+                    person,
+
+                    candidate.x,
+                    candidate.y
+                )
+        );
+
+
+    if (
+        walkableCandidates.length ===
+        0
+    ) {
+
+        return false;
+    }
+
+
+    /*
+        Foretrekk en ledig tile.
+
+        Hvis alle mulige steg er occupied,
+        får NPC-en lov til å passere gjennom
+        en annen NPC eller spilleren.
+    */
+
+    const uncrowdedCandidates =
+
+        walkableCandidates.filter(
+            candidate =>
+
+                !isPhysicalPersonTileCrowded(
+
+                    person,
+
+                    candidate.x,
+                    candidate.y
+                )
+        );
+
+
+    const usableCandidates =
+
+        uncrowdedCandidates.length > 0
+
+            ? uncrowdedCandidates
+
+            : walkableCandidates;
+
+
+    for (
+        const candidate
+        of usableCandidates
+    ) {
+
+        if (
+            movePhysicalPerson(
+
+                person,
+
+                candidate.x,
+                candidate.y
+            )
+        ) {
+
+            return true;
+        }
+    }
+
+
+    return false;
+}
+
+
+/* =========================================================
+   SETTLEMENT PATH LOOKUP
+========================================================= */
+
+function getSettlementPathKeySet(
+    settlement
+) {
+
+    return new Set(
+
+        (
+            settlement.pathTiles ??
+            []
+        ).map(
+            point =>
+                `${point.x},${point.y}`
+        )
+    );
+}
+
+
+/* =========================================================
+   FIND NEXT STEP ALONG SETTLEMENT PATH
+========================================================= */
+
+function findNextSettlementPathStep(
+    settlement,
+    startX,
+    startY,
+    targetX,
+    targetY
+) {
+
+    const startKey =
+        `${startX},${startY}`;
+
+    const targetKey =
+        `${targetX},${targetY}`;
+
+
+    if (
+        startKey ===
+        targetKey
+    ) {
+
+        return null;
+    }
+
+
+    const pathSet =
+        getSettlementPathKeySet(
+            settlement
+        );
+
+
+    if (
+        !pathSet.has(
+            startKey
+        ) ||
+
+        !pathSet.has(
+            targetKey
+        )
+    ) {
+
+        return null;
+    }
+
+
+    const queue = [
+        startKey
+    ];
+
+
+    let queueIndex =
+        0;
+
+
+    const cameFrom =
+
+        new Map([
+            [
+                startKey,
+                null
+            ]
+        ]);
+
+
+    const directions = [
+
+        { x: 0,  y: -1 },
+        { x: 1,  y: 0 },
+        { x: 0,  y: 1 },
+        { x: -1, y: 0 }
+    ];
+
+
+    while (
+        queueIndex <
+        queue.length
+    ) {
+
+        const currentKey =
+
+            queue[
+                queueIndex++
+            ];
+
+
+        const [
+            currentX,
+            currentY
+        ] =
+
+            currentKey
+                .split(",")
+                .map(
+                    Number
+                );
+
+
+        for (
+            const direction
+            of directions
+        ) {
+
+            const nextX =
+
+                currentX +
+                direction.x;
+
+            const nextY =
+
+                currentY +
+                direction.y;
+
+
+            const nextKey =
+                `${nextX},${nextY}`;
+
+
+            if (
+                !pathSet.has(
+                    nextKey
+                ) ||
+
+                cameFrom.has(
+                    nextKey
+                )
+            ) {
+
+                continue;
+            }
+
+
+            cameFrom.set(
+                nextKey,
+                currentKey
+            );
+
+
+            if (
+                nextKey ===
+                targetKey
+            ) {
+
+                /*
+                    Walk bakover fra target til
+                    første steg etter start.
+                */
+
+                let stepKey =
+                    targetKey;
+
+
+                let previousKey =
+
+                    cameFrom.get(
+                        stepKey
+                    );
+
+
+                while (
+                    previousKey &&
+                    previousKey !==
+                        startKey
+                ) {
+
+                    stepKey =
+                        previousKey;
+
+
+                    previousKey =
+
+                        cameFrom.get(
+                            stepKey
+                        );
+                }
+
+
+                const [
+                    x,
+                    y
+                ] =
+
+                    stepKey
+                        .split(",")
+                        .map(
+                            Number
+                        );
+
+
+                return {
+                    x,
+                    y
+                };
+            }
+
+
+            queue.push(
+                nextKey
+            );
+        }
+    }
+
+
+    return null;
+}
+
+
+/* =========================================================
+   DAILY NPC SCHEDULE
+========================================================= */
+
+function isPersonDaytimeActive(
+    person
+) {
+
+    const lifeStage =
+        getPersonLifeStage(
+            person
+        );
+
+
+    /*
+        Children er ute litt kortere.
+    */
+
+    if (
+        lifeStage ===
+        "child"
+    ) {
+
+        return (
+
+            worldTime.hour >= 8 &&
+            worldTime.hour < 18
+        );
+    }
+
+
+    /*
+        Elders går også hjem litt tidligere.
+    */
+
+    if (
+        lifeStage ===
+        "elder"
+    ) {
+
+        return (
+
+            worldTime.hour >= 8 &&
+            worldTime.hour < 19
+        );
+    }
+
+
+    return (
+
+        worldTime.hour >= 7 &&
+        worldTime.hour < 20
+    );
+}
+
+
+/* =========================================================
+   DAYTIME MOVEMENT
+========================================================= */
+
+function movePersonOutForDay(
+    person,
+    settlement,
+    placement
+) {
+
+    const outsideDoor =
+
+        getSettlementHouseOutsideDoorTile(
+            placement
+        );
+
+
+    /*
+        Først gå fra interior til door.
+    */
+
+    if (
+        isPersonInsideHouseInterior(
+            person,
+            placement
+        )
+    ) {
+
+        movePhysicalPersonTowardTile(
+
+            person,
+
+            placement.doorX,
+            placement.doorY
+        );
+
+
+        return;
+    }
+
+
+    /*
+        Fra door til settlement-path.
+    */
+
+    if (
+        person.worldX ===
+            placement.doorX &&
+
+        person.worldY ===
+            placement.doorY
+    ) {
+
+        movePhysicalPerson(
+
+            person,
+
+            outsideDoor.x,
+            outsideDoor.y
+        );
+
+
+        return;
+    }
+
+
+    const pathSet =
+        getSettlementPathKeySet(
+            settlement
+        );
+
+
+    const currentKey =
+        `${person.worldX},${person.worldY}`;
+
+
+    /*
+        Safety dersom NPC somehow har
+        havnet utenfor road network.
+    */
+
+    if (
+        !pathSet.has(
+            currentKey
+        )
+    ) {
+
+        movePhysicalPersonTowardTile(
+
+            person,
+
+            outsideDoor.x,
+            outsideDoor.y
+        );
+
+
+        return;
+    }
+
+
+    const directions = [
+
+        { x: 0,  y: -1 },
+        { x: 1,  y: 0 },
+        { x: 0,  y: 1 },
+        { x: -1, y: 0 }
+    ];
+
+
+    const choices =
+
+        directions
+
+            .map(
+                direction => ({
+
+                    x:
+                        person.worldX +
+                        direction.x,
+
+                    y:
+                        person.worldY +
+                        direction.y
+                })
+            )
+
+            .filter(
+                point =>
+
+                    pathSet.has(
+                        `${point.x},${point.y}`
+                    ) &&
+
+                    canPhysicalPersonMoveTo(
+
+                        person,
+
+                        point.x,
+                        point.y
+                    )
+            );
+
+
+    if (
+        choices.length ===
+        0
+    ) {
+
+        return;
+    }
+
+
+    /*
+        Prøv å unngå at NPC bare går
+        fram og tilbake på samme to tiles.
+    */
+
+    const forwardChoices =
+
+        choices.filter(
+            point =>
+
+                point.x !==
+                    person.npcPreviousX ||
+
+                point.y !==
+                    person.npcPreviousY
+        );
+
+
+    const directionChoices =
+
+        forwardChoices.length > 0
+
+            ? forwardChoices
+
+            : choices;
+
+
+    /*
+        Ved vanlig wandering foretrekker NPC-en
+        en tile uten player/andre NPC-er.
+
+        Bare hvis alle gyldige valg er crowded
+        tillates overlap.
+    */
+
+    const uncrowdedChoices =
+
+        directionChoices.filter(
+            point =>
+
+                !isPhysicalPersonTileCrowded(
+
+                    person,
+
+                    point.x,
+                    point.y
+                )
+        );
+
+
+    const usable =
+
+        uncrowdedChoices.length > 0
+
+            ? uncrowdedChoices
+
+            : directionChoices;
+
+
+    const choice =
+
+        usable[
+            Math.floor(
+                simulationRandom() *
+                usable.length
+            )
+        ];
+
+
+    movePhysicalPerson(
+
+        person,
+
+        choice.x,
+        choice.y
+    );
+}
+
+/* =========================================================
+   WORK SCHEDULE
+========================================================= */
+
+function isPersonWorkingNow(
+    person
+) {
+
+    return (
+
+        person &&
+        person.profession &&
+        getPersonLifeStage(
+            person
+        ) ===
+            "adult" &&
+
+        worldTime.hour >= 8 &&
+        worldTime.hour < 17
+    );
+}
+
+/* =========================================================
+   FARMER -> FIELD
+========================================================= */
+
+function moveFarmerToField(
+    person,
+    settlement,
+    homePlacement,
+    workplace
+) {
+
+    if (
+        !person ||
+        !settlement ||
+        !homePlacement ||
+        !workplace ||
+
+        !workplace.farmFieldBounds ||
+
+        !Number.isInteger(
+            person.workFieldX
+        ) ||
+
+        !Number.isInteger(
+            person.workFieldY
+        )
+    ) {
+
+        return false;
+    }
+
+
+    const homeOutside =
+
+        getSettlementHouseOutsideDoorTile(
+            homePlacement
+        );
+
+
+    const workOutside =
+
+        getSettlementHouseOutsideDoorTile(
+            workplace
+        );
+
+
+    /*
+        Allerede ute på field.
+    */
+
+    if (
+        isPersonInsideFarmField(
+            person,
+            workplace
+        )
+    ) {
+
+        movePhysicalPersonTowardTile(
+
+            person,
+
+            person.workFieldX,
+            person.workFieldY
+        );
+
+
+        return true;
+    }
+
+
+    /*
+        Rear door mot field.
+    */
+
+    if (
+        person.worldX ===
+            workplace.fieldDoorX &&
+
+        person.worldY ===
+            workplace.fieldDoorY
+    ) {
+
+        movePhysicalPersonTowardTile(
+
+            person,
+
+            person.workFieldX,
+            person.workFieldY
+        );
+
+
+        return true;
+    }
+
+
+    /*
+        Inne i Farmstead:
+        gå mot rear door.
+    */
+
+    if (
+        isPersonInsideHouseInterior(
+            person,
+            workplace
+        )
+    ) {
+
+        movePhysicalPersonTowardTile(
+
+            person,
+
+            workplace.fieldDoorX,
+            workplace.fieldDoorY
+        );
+
+
+        return true;
+    }
+
+
+    /*
+        Main Farmstead door.
+    */
+
+    if (
+        person.worldX ===
+            workplace.doorX &&
+
+        person.worldY ===
+            workplace.doorY
+    ) {
+
+        movePhysicalPersonTowardTile(
+
+            person,
+
+            workplace.fieldDoorX,
+            workplace.fieldDoorY
+        );
+
+
+        return true;
+    }
+
+
+    /*
+        Rett utenfor Farmstead.
+    */
+
+    if (
+        person.worldX ===
+            workOutside.x &&
+
+        person.worldY ===
+            workOutside.y
+    ) {
+
+        movePhysicalPerson(
+
+            person,
+
+            workplace.doorX,
+            workplace.doorY
+        );
+
+
+        return true;
+    }
+
+
+    /*
+        Først ut av eget hus.
+    */
+
+    if (
+        isPersonInsideHouseInterior(
+            person,
+            homePlacement
+        )
+    ) {
+
+        movePhysicalPersonTowardTile(
+
+            person,
+
+            homePlacement.doorX,
+            homePlacement.doorY
+        );
+
+
+        return true;
+    }
+
+
+    if (
+        person.worldX ===
+            homePlacement.doorX &&
+
+        person.worldY ===
+            homePlacement.doorY
+    ) {
+
+        movePhysicalPerson(
+
+            person,
+
+            homeOutside.x,
+            homeOutside.y
+        );
+
+
+        return true;
+    }
+
+
+    /*
+        Følg settlement road til Farmstead.
+    */
+
+    const nextStep =
+
+        findNextSettlementPathStep(
+
+            settlement,
+
+            person.worldX,
+            person.worldY,
+
+            workOutside.x,
+            workOutside.y
+        );
+
+
+    if (nextStep) {
+
+        movePhysicalPerson(
+
+            person,
+
+            nextStep.x,
+            nextStep.y
+        );
+
+
+        return true;
+    }
+
+
+    return false;
+}
+
+/* =========================================================
+   MOVE PERSON TO WORKPLACE
+========================================================= */
+
+function movePersonToWork(
+    person,
+    settlement,
+    homePlacement,
+    workplace
+) {
+
+    if (
+        !person ||
+        !settlement ||
+        !homePlacement ||
+        !workplace
+    ) {
+
+        return;
+    }
+
+
+    /*
+        Farmers bruker Farmstead som gjennomgang
+        og jobber fysisk ute på field.
+    */
+
+    if (
+        person.profession ===
+            "farmer" &&
+
+        workplace.farmFieldBounds
+    ) {
+
+        moveFarmerToField(
+
+            person,
+            settlement,
+            homePlacement,
+            workplace
+        );
+
+
+        return;
+    }
+
+
+    const homeOutside =
+
+        getSettlementHouseOutsideDoorTile(
+            homePlacement
+        );
+
+
+    const workOutside =
+
+        getSettlementHouseOutsideDoorTile(
+            workplace
+        );
+
+
+    /*
+        Allerede inne på jobb:
+        gå til personens assigned work tile
+        og bli der.
+    */
+
+    if (
+        isPersonInsideHouseInterior(
+            person,
+            workplace
+        )
+    ) {
+
+        movePhysicalPersonTowardTile(
+
+            person,
+
+            person.workInteriorX ??
+                workplace.x,
+
+            person.workInteriorY ??
+                workplace.y
+        );
+
+
+        return;
+    }
+
+
+    /*
+        Workplace door -> interior.
+    */
+
+    if (
+        person.worldX ===
+            workplace.doorX &&
+
+        person.worldY ===
+            workplace.doorY
+    ) {
+
+        movePhysicalPersonTowardTile(
+
+            person,
+
+            person.workInteriorX ??
+                workplace.x,
+
+            person.workInteriorY ??
+                workplace.y
+        );
+
+
+        return;
+    }
+
+
+    /*
+        Rett utenfor workplace.
+    */
+
+    if (
+        person.worldX ===
+            workOutside.x &&
+
+        person.worldY ===
+            workOutside.y
+    ) {
+
+        movePhysicalPerson(
+
+            person,
+
+            workplace.doorX,
+            workplace.doorY
+        );
+
+
+        return;
+    }
+
+
+    /*
+        Først ut av eget hus.
+    */
+
+    if (
+        isPersonInsideHouseInterior(
+            person,
+            homePlacement
+        )
+    ) {
+
+        movePhysicalPersonTowardTile(
+
+            person,
+
+            homePlacement.doorX,
+            homePlacement.doorY
+        );
+
+
+        return;
+    }
+
+
+    if (
+        person.worldX ===
+            homePlacement.doorX &&
+
+        person.worldY ===
+            homePlacement.doorY
+    ) {
+
+        movePhysicalPerson(
+
+            person,
+
+            homeOutside.x,
+            homeOutside.y
+        );
+
+
+        return;
+    }
+
+
+    /*
+        På road network:
+        finn neste step mot workplace.
+    */
+
+    const nextStep =
+
+        findNextSettlementPathStep(
+
+            settlement,
+
+            person.worldX,
+            person.worldY,
+
+            workOutside.x,
+            workOutside.y
+        );
+
+
+    if (nextStep) {
+
+        movePhysicalPerson(
+
+            person,
+
+            nextStep.x,
+            nextStep.y
+        );
+    }
+}
+
+/* =========================================================
+   RETURN HOME
+========================================================= */
+
+function movePersonHomeForNight(
+    person,
+    settlement,
+    placement
+) {
+
+    const outsideDoor =
+
+        getSettlementHouseOutsideDoorTile(
+            placement
+        );
+
+    /*
+        Hvis personen er på jobb når arbeidsdagen
+        er over, må han først komme seg ut av
+        workplace-bygningen og tilbake på road.
+    */
+
+    const workplace =
+
+        getPersonWorkplacePlacement(
+            person,
+            settlement
+        );
+
+
+    /*
+        Farmer ute på field må først gå
+        tilbake gjennom rear door.
+    */
+
+    if (
+        workplace &&
+
+        workplace.professionId ===
+            "farmer" &&
+
+        workplace.farmFieldBounds
+    ) {
+
+        /*
+            Field -> rear door.
+        */
+
+        if (
+            isPersonInsideFarmField(
+                person,
+                workplace
+            )
+        ) {
+
+            movePhysicalPersonTowardTile(
+
+                person,
+
+                workplace.fieldDoorX,
+                workplace.fieldDoorY
+            );
+
+
+            return;
+        }
+
+
+        /*
+            Rear door -> inn i Farmstead.
+
+            Neste turn tar den vanlige workplace-
+            logikken over og sender dem mot
+            hoveddøra.
+        */
+
+        if (
+            person.worldX ===
+                workplace.fieldDoorX &&
+
+            person.worldY ===
+                workplace.fieldDoorY
+        ) {
+
+            movePhysicalPersonTowardTile(
+
+                person,
+
+                workplace.x,
+                workplace.y
+            );
+
+
+            return;
+        }
+    }
+
+
+    if (workplace) {
+
+        const workplaceOutside =
+
+            getSettlementHouseOutsideDoorTile(
+                workplace
+            );
+
+
+        if (
+            isPersonInsideHouseInterior(
+                person,
+                workplace
+            )
+        ) {
+
+            movePhysicalPersonTowardTile(
+
+                person,
+
+                workplace.doorX,
+                workplace.doorY
+            );
+
+
+            return;
+        }
+
+
+        if (
+            person.worldX ===
+                workplace.doorX &&
+
+            person.worldY ===
+                workplace.doorY
+        ) {
+
+            movePhysicalPerson(
+
+                person,
+
+                workplaceOutside.x,
+                workplaceOutside.y
+            );
+
+
+            return;
+        }
+    }
+
+
+    /*
+        Allerede inne:
+        finn personens egen interior tile.
+    */
+
+    if (
+        isPersonInsideHouseInterior(
+            person,
+            placement
+        )
+    ) {
+
+        movePhysicalPersonTowardTile(
+
+            person,
+
+            person.homeInteriorX,
+            person.homeInteriorY
+        );
+
+
+        return;
+    }
+
+
+    /*
+        Står i selve døra.
+    */
+
+    if (
+        person.worldX ===
+            placement.doorX &&
+
+        person.worldY ===
+            placement.doorY
+    ) {
+
+        movePhysicalPersonTowardTile(
+
+            person,
+
+            person.homeInteriorX,
+            person.homeInteriorY
+        );
+
+
+        return;
+    }
+
+
+    /*
+        Rett utenfor døra.
+    */
+
+    if (
+        person.worldX ===
+            outsideDoor.x &&
+
+        person.worldY ===
+            outsideDoor.y
+    ) {
+
+        movePhysicalPerson(
+
+            person,
+
+            placement.doorX,
+            placement.doorY
+        );
+
+
+        return;
+    }
+
+
+    /*
+        Finn neste road-step mot eget hus.
+    */
+
+    const nextStep =
+
+        findNextSettlementPathStep(
+
+            settlement,
+
+            person.worldX,
+            person.worldY,
+
+            outsideDoor.x,
+            outsideDoor.y
+        );
+
+
+    if (nextStep) {
+
+        movePhysicalPerson(
+
+            person,
+
+            nextStep.x,
+            nextStep.y
+        );
+    }
+}
+
+
+/* =========================================================
+   UPDATE PHYSICAL NPCS
+========================================================= */
+
+function updatePhysicalSettlementNpcs() {
+
+    /*
+        NPC-en vi aktivt snakker/trader med
+        står stille mens vinduet er åpent.
+    */
+
+    const focusedPersonId =
+
+        isSettlementWindowOpen()
+
+            ? settlementWindowState
+                .personId
+
+            : null;
+
+
+    for (
+        const settlement
+        of settlements
+    ) {
+
+        if (
+            !isSettlementPhysicalNpcActive(
+                settlement
+            )
+        ) {
+
+            continue;
+        }
+
+
+        ensureSettlementLayout(
+            settlement
+        );
+
+
+        for (
+            const person
+            of people
+        ) {
+
+            if (
+                !person.alive ||
+
+                person.settlementId !==
+                    settlement.id ||
+
+                person.id ===
+                    focusedPersonId
+            ) {
+
+                continue;
+            }
+
+
+            if (
+                !initializePersonPhysicalPosition(
+
+                    person,
+                    settlement
+                )
+            ) {
+
+                continue;
+            }
+
+
+            const placement =
+
+                getPersonHousePlacement(
+
+                    person,
+                    settlement
+                );
+
+
+            if (!placement) {
+
+                continue;
+            }
+
+
+            const workplace =
+
+                getPersonWorkplacePlacement(
+
+                    person,
+                    settlement
+                );
+
+
+            /*
+                Working adults går faktisk til
+                workplace mellom 08:00 og 17:00.
+            */
+
+            if (
+                workplace &&
+                isPersonWorkingNow(
+                    person
+                )
+            ) {
+
+                movePersonToWork(
+
+                    person,
+                    settlement,
+                    placement,
+                    workplace
+                );
+
+
+                continue;
+            }
+
+
+            /*
+                Når arbeidsdagen er ferdig går
+                workers hjem i stedet for å
+                fortsette random wandering.
+            */
+
+            if (
+                workplace &&
+                getPersonLifeStage(
+                    person
+                ) ===
+                    "adult" &&
+
+                worldTime.hour >= 17
+            ) {
+
+                movePersonHomeForNight(
+
+                    person,
+                    settlement,
+                    placement
+                );
+
+
+                continue;
+            }
+
+
+            if (
+                isPersonDaytimeActive(
+                    person
+                )
+            ) {
+
+                if (
+                    simulationRandom() <=
+                    CIVILIZATION_SIMULATION_RULES
+                        .npcMoveChance
+                ) {
+
+                    movePersonOutForDay(
+
+                        person,
+                        settlement,
+                        placement
+                    );
+                }
+
+            } else {
+
+                movePersonHomeForNight(
+
+                    person,
+                    settlement,
+                    placement
+                );
+            }
+        }
+    }
+}
+
+
+/* =========================================================
+   DRAW PHYSICAL NPCS
+========================================================= */
+
+function drawPhysicalPeople(
+    camera
+) {
+
+    for (
+        const person
+        of people
+    ) {
+
+        if (
+            !person.alive ||
+
+            person.physicalInitialized !==
+                true
+        ) {
+
+            continue;
+        }
+
+
+        const settlement =
+            getSettlementById(
+                person.settlementId
+            );
+
+
+        if (
+            !isSettlementPhysicalNpcActive(
+                settlement
+            )
+        ) {
+
+            continue;
+        }
+
+
+        const screenX =
+
+            person.worldX -
+            camera.x;
+
+        const screenY =
+
+            person.worldY -
+            camera.y;
+
+
+        if (
+            screenX < 0 ||
+            screenY < 0 ||
+
+            screenX >=
+                camera.columns ||
+
+            screenY >=
+                camera.rows
+        ) {
+
+            continue;
+        }
+
+
+        ctx.fillStyle =
+
+            person.color ??
+            "#f1d680";
+
+
+        ctx.fillText(
+
+            person.char ??
+                "p",
+
+            screenX *
+                CELL_WIDTH +
+                CELL_WIDTH / 2,
+
+            screenY *
+                CELL_HEIGHT +
+                CELL_HEIGHT / 2
+        );
+    }
+}
+
+/* =========================================================
+   SETTLEMENT HOUSE CANDIDATES
+========================================================= */
+
+function getSettlementHouseCandidates(
+    settlement
+) {
+
+    const candidates =
+        [];
+
+
+    if (!settlement) {
+
+        return candidates;
+    }
+
+
+    const radius =
+
+        SETTLEMENT_LAYOUT_RULES
+            .layoutRadius;
+
+
+    /*
+        Finn alle gyldige CENTER positions
+        for et family house.
+    */
+
+    for (
+        let dy = -radius;
+        dy <= radius;
+        dy++
+    ) {
+
+        for (
+            let dx = -radius;
+            dx <= radius;
+            dx++
+        ) {
+
+            const centerX =
+
+                settlement.x +
+                dx;
+
+
+            const centerY =
+
+                settlement.y +
+                dy;
+
+
+            if (
+                !isValidSettlementHouseFootprint(
+
+                    settlement,
+
+                    centerX,
+                    centerY
+                )
+            ) {
+
+                continue;
+            }
+
+
+            const distance =
+
+                Math.sqrt(
+
+                    dx * dx +
+                    dy * dy
+                );
+
+
+            /*
+                Litt deterministic variation gjør
+                at husene ikke alltid velges i
+                perfekte ringer rundt sentrum.
+            */
+
+            const variation =
+
+                WORLDGEN.hashNoise(
+
+                    centerX,
+                    centerY,
+
+                    WORLD_SEED +
+                        86100
+                );
+
+
+            candidates.push({
+
+                x:
+                    centerX,
+
+                y:
+                    centerY,
+
+                priority:
+
+                    distance +
+
+                    variation *
+                        6
+            });
+        }
+    }
+
+
+    /*
+        Beste / nærmeste spots først.
+    */
+
+    candidates.sort(
+
+        (
+            a,
+            b
+        ) =>
+
+            a.priority -
+            b.priority
+    );
+
+
+    return candidates;
+}
+
+/* =========================================================
+   SETTLEMENT HOUSE PLAN
+========================================================= */
+
+function getSettlementHousePlan(
+    settlement
+) {
+
+    const candidates =
+
+        getSettlementHouseCandidates(
+            settlement
+        );
+
+
+    const slots =
+        [];
+
+
+    if (!settlement) {
+
+        return {
+            candidates,
+            slots
+        };
+    }
+
+
+    /*
+        Legg til ett virtuelt house slot.
+
+        Dette er bare planlegging.
+        Ingen bygning opprettes her.
+    */
+
+    function tryPlaceSlot(
+        gap
+    ) {
+
+        for (
+            const candidate
+            of candidates
+        ) {
+
+            const bounds =
+
+                getSettlementHouseBounds(
+
+                    candidate.x,
+                    candidate.y
+                );
+
+
+            const overlaps =
+
+                slots.some(
+                    slot =>
+
+                        doSettlementHouseBoundsOverlap(
+
+                            slot.bounds,
+
+                            bounds,
+
+                            gap
+                        )
+                );
+
+
+            if (overlaps) {
+
+                continue;
+            }
+
+
+            slots.push({
+
+                x:
+                    candidate.x,
+
+                y:
+                    candidate.y,
+
+                bounds
+            });
+
+
+            return true;
+        }
+
+
+        return false;
+    }
+
+
+    /*
+        Først prøver vi ønsket spacing.
+    */
+
+    while (
+        tryPlaceSlot(
+
+            SETTLEMENT_LAYOUT_RULES
+                .houseGap
+        )
+    ) {
+
+        /*
+            Fortsett til ingen flere får plass
+            med normal avstand.
+        */
+    }
+
+
+    /*
+        Difficult terrain fallback.
+
+        Etterpå tillates houses rett ved
+        siden av hverandre, men aldri overlap.
+    */
+
+    while (
+        tryPlaceSlot(
+            0
+        )
+    ) {
+
+        /*
+            Fortsett til området er fullt.
+        */
+    }
+
+
+    return {
+        candidates,
+        slots
+    };
+}
+
+/* =========================================================
+   SETTLEMENT HOUSE CAPACITY
+========================================================= */
+
+function getSettlementHouseCapacity(
+    settlement
+) {
+
+    if (!settlement) {
+
+        return 0;
+    }
+
+
+    return getSettlementHousePlan(
+        settlement
+    ).slots.length;
+}
+
+/* =========================================================
+   GENERATE SETTLEMENT LAYOUT
+========================================================= */
+
+function ensureSettlementLayout(
+    settlement
+) {
+
+    if (
+        !settlement ||
+        settlement.layoutGenerated ===
+            true
+    ) {
+
+        return;
+    }
+
+
+    /*
+        Vi trenger families før vi kan
+        generere family homes.
+    */
+
+    ensureInfiniteSettlementPopulation(
+        settlement
+    );
+
+
+    const familyIds =
+
+        [
+            ...settlement.familyIds
+        ];
+
+
+    const housePlan =
+
+        getSettlementHousePlan(
+            settlement
+        );
+
+
+    const candidates =
+        housePlan.candidates;
+
+
+    const availableHouseSlots =
+        housePlan.slots;
+
+
+    const placements =
+        [];
+
+
+    /*
+        Hver genererte familie får nå direkte
+        ett slot fra nøyaktig samme house-plan
+        som ble brukt til å beregne capacity.
+    */
+
+    for (
+        let familyIndex = 0;
+
+        familyIndex <
+            familyIds.length;
+
+        familyIndex++
+    ) {
+
+        const familyId =
+            familyIds[
+                familyIndex
+            ];
+
+
+        const slot =
+            availableHouseSlots[
+                familyIndex
+            ];
+
+
+        /*
+            Dette skal normalt aldri kunne skje.
+
+            Population-generatoren skal allerede
+            ha begrenset antall families etter
+            samme house-plan.
+        */
+
+        if (!slot) {
+
+            console.error(
+
+                `${settlement.name}: no house slot available for family ${familyId}.`
+            );
+
+            continue;
+        }
+
+
+        const door =
+
+            getSettlementHouseDoor(
+
+                settlement,
+
+                slot.x,
+                slot.y
+            );
+
+
+        const placement = {
+
+            id:
+
+                `settlement_house_${settlement.id}_${familyId}`,
+
+            type:
+                "family_house",
+
+            x:
+                slot.x,
+
+            y:
+                slot.y,
+
+            width:
+
+                SETTLEMENT_LAYOUT_RULES
+                    .houseWidth,
+
+            height:
+
+                SETTLEMENT_LAYOUT_RULES
+                    .houseHeight,
+
+            bounds:
+                slot.bounds,
+
+            doorX:
+                door.x,
+
+            doorY:
+                door.y,
+
+            familyId,
+
+            settlementId:
+                settlement.id
+        };
+
+
+        placements.push(
+            placement
+        );
+
+
+        const family =
+
+            getSettlementFamilyRecord(
+
+                settlement,
+
+                familyId
+            );
+
+
+        if (family) {
+
+            /*
+                homeX/homeY er entrance.
+            */
+
+            family.homeObjectId =
+                placement.id;
+
+            family.homeX =
+                placement.doorX;
+
+            family.homeY =
+                placement.doorY;
+
+            family.homeDoorX =
+                placement.doorX;
+
+            family.homeDoorY =
+                placement.doorY;
+
+            family.homeCenterX =
+                placement.x;
+
+            family.homeCenterY =
+                placement.y;
+        }
+    }
+
+
+    settlement.housePlacements =
+        placements;
+
+
+    /*
+        Legg til ett workplace per profession
+        som faktisk finnes i settlementet.
+    */
+
+    const workplacePlacements =
+
+        generateSettlementWorkplacePlacements(
+
+            settlement,
+
+            candidates,
+
+            placements
+        );
+
+
+    settlement.workplacePlacements =
+        workplacePlacements;
+
+
+    /*
+        Houses og workplaces kobles til samme
+        settlement road network.
+    */
+
+    settlement.pathTiles =
+
+        generateSettlementPathNetwork(
+
+            settlement,
+
+            [
+                ...placements,
+                ...workplacePlacements
+            ]
+        );
+
+
+    settlement.layoutGenerated =
+        true;
+
+
+    if (
+        placements.length <
+        familyIds.length
+    ) {
+
+        console.warn(
+
+            `${settlement.name}: placed ${placements.length}/${familyIds.length} houses.`
+        );
+    }
+}
+
+
+/* =========================================================
+   MATERIALIZE HOUSE CELLS
+========================================================= */
+
+function generateSettlementStructuresForChunk(
+    chunkX,
+    chunkY
+) {
+
+    const chunkKey =
+
+        WORLDGEN.getChunkKey(
+
+            chunkX,
+            chunkY
+        );
+
+
+    const chunkStartX =
+
+        chunkX *
+        WORLDGEN.CHUNK_SIZE;
+
+
+    const chunkStartY =
+
+        chunkY *
+        WORLDGEN.CHUNK_SIZE;
+
+
+    const chunkEndX =
+
+        chunkStartX +
+        WORLDGEN.CHUNK_SIZE -
+        1;
+
+
+    const chunkEndY =
+
+        chunkStartY +
+        WORLDGEN.CHUNK_SIZE -
+        1;
+
+
+    /*
+        Houses kan krysse chunk boundary.
+
+        Derfor sjekker vi settlements litt
+        utenfor selve chunken også.
+    */
+
+    const reach =
+
+        SETTLEMENT_LAYOUT_RULES
+            .layoutRadius +
+
+        SETTLEMENT_LAYOUT_RULES
+            .houseWidth +
+
+        SETTLEMENT_FARM_RULES
+            .fieldSizes[0]
+            .width +
+
+        4;
+
+
+    for (
+        const settlement
+        of settlements
+    ) {
+
+        if (
+            settlement.x <
+                chunkStartX -
+                reach ||
+
+            settlement.x >
+                chunkEndX +
+                reach ||
+
+            settlement.y <
+                chunkStartY -
+                reach ||
+
+            settlement.y >
+                chunkEndY +
+                reach
+        ) {
+
+            continue;
+        }
+
+
+        ensureSettlementLayout(
+            settlement
+        );
+
+
+        /*
+            =========================================
+            FARM FIELDS
+            =========================================
+
+            Field materialiseres før roads/buildings.
+        */
+
+        for (
+            const placement
+            of settlement.workplacePlacements ?? []
+        ) {
+
+            if (
+                placement.professionId !==
+                    "farmer" ||
+
+                !placement.farmFieldBounds
+            ) {
+
+                continue;
+            }
+
+
+            const fieldBounds =
+                placement.farmFieldBounds;
+
+
+            for (
+                let y = fieldBounds.top;
+                y <= fieldBounds.bottom;
+                y++
+            ) {
+
+                for (
+                    let x = fieldBounds.left;
+                    x <= fieldBounds.right;
+                    x++
+                ) {
+
+                    if (
+                        getWorldChunkKeyAt(
+                            x,
+                            y
+                        ) !==
+                        chunkKey
+                    ) {
+
+                        continue;
+                    }
+
+
+                    const tile =
+
+                        getTile(
+                            x,
+                            y
+                        );
+
+
+                    if (
+                        !tile ||
+                        tile.river
+                    ) {
+
+                        continue;
+                    }
+
+
+                    tile.type =
+                        "farmField";
+
+                    tile.settlementId =
+                        settlement.id;
+
+                    tile.workplaceId =
+                        placement.id;
+                }
+            }
+        }
+
+
+        /*
+            Materialiser paths før houses.
+
+            Houses tegnes etterpå og får dermed
+            alltid siste ord på sitt eget footprint.
+        */
+
+        for (
+            const point
+            of settlement.pathTiles ?? []
+        ) {
+
+            /*
+                Bare path tiles som tilhører
+                akkurat denne chunken.
+            */
+
+            if (
+                getWorldChunkKeyAt(
+                    point.x,
+                    point.y
+                ) !==
+                chunkKey
+            ) {
+
+                continue;
+            }
+
+
+            const tile =
+                getTile(
+                    point.x,
+                    point.y
+                );
+
+
+            if (
+                !tile ||
+                tile.river
+            ) {
+
+                continue;
+            }
+
+
+            /*
+                Paths rydder automatisk grass,
+                trees, pine osv.
+            */
+
+            tile.type =
+                "settlementPath";
+
+
+            tile.settlementId =
+                settlement.id;
+        }
+
+        /*
+            Materialiser workplaces.
+
+            De bruker samme 7 x 5 footprint som
+            family houses i første versjon, men
+            har egne world-object types og sign.
+        */
+
+        for (
+            const placement
+            of settlement.workplacePlacements ?? []
+        ) {
+
+            const bounds =
+
+                placement.bounds ??
+
+                getSettlementHouseBounds(
+
+                    placement.x,
+                    placement.y
+                );
+
+
+            for (
+                let y = bounds.top;
+                y <= bounds.bottom;
+                y++
+            ) {
+
+                for (
+                    let x = bounds.left;
+                    x <= bounds.right;
+                    x++
+                ) {
+
+                    if (
+                        getWorldChunkKeyAt(
+                            x,
+                            y
+                        ) !==
+                        chunkKey
+                    ) {
+
+                        continue;
+                    }
+
+
+                    const tile =
+                        getTile(
+                            x,
+                            y
+                        );
+
+
+                    if (!tile) {
+
+                        continue;
+                    }
+
+
+                    tile.type =
+                        "houseFloor";
+
+                    tile.settlementId =
+                        settlement.id;
+
+
+                    const isBorder =
+
+                        x === bounds.left ||
+                        x === bounds.right ||
+                        y === bounds.top ||
+                        y === bounds.bottom;
+
+
+                    if (!isBorder) {
+
+                        continue;
+                    }
+
+
+                    const isDoor =
+
+                        (
+                            x === placement.doorX &&
+                            y === placement.doorY
+                        ) ||
+
+                        (
+                            Number.isInteger(
+                                placement.fieldDoorX
+                            ) &&
+
+                            Number.isInteger(
+                                placement.fieldDoorY
+                            ) &&
+
+                            x === placement.fieldDoorX &&
+                            y === placement.fieldDoorY
+                        );
+
+
+                    const objectId =
+
+                        `${placement.id}_cell_${x}_${y}`;
+
+
+                    if (
+                        getWorldObjectById(
+                            objectId
+                        )
+                    ) {
+
+                        continue;
+                    }
+
+
+                    const objectType =
+
+                        isDoor
+
+                            ? "settlement_workplace_door"
+
+                            : "settlement_workplace_wall";
+
+
+                    const renderChar =
+
+                        isDoor
+
+                            ? "+"
+
+                            : getSettlementHouseWallChar(
+
+                                bounds,
+
+                                x,
+                                y
+                            );
+
+
+                    worldObjects.push({
+
+                        id:
+                            objectId,
+
+                        type:
+                            objectType,
+
+                        x,
+                        y,
+
+                        depleted:
+                            false,
+
+                        regrowAtMinutes:
+                            null,
+
+                        state: {
+
+                            settlementId:
+                                settlement.id,
+
+                            workplaceId:
+                                placement.id,
+
+                            professionId:
+                                placement.professionId,
+
+                            workplaceName:
+                                placement.name,
+
+                            renderChar
+                        },
+
+                        generatedChunkKey:
+                            chunkKey,
+
+                        settlementStructure:
+                            true
+                    });
+                }
+            }
+
+
+            /*
+                Et lite symbol inne i bygningen
+                viser hvilken type workplace det er.
+            */
+
+            if (
+                getWorldChunkKeyAt(
+
+                    placement.x,
+                    placement.y
+
+                ) ===
+                chunkKey
+            ) {
+
+                const signId =
+
+                    `${placement.id}_sign`;
+
+
+                if (
+                    !getWorldObjectById(
+                        signId
+                    )
+                ) {
+
+                    worldObjects.push({
+
+                        id:
+                            signId,
+
+                        type:
+                            "settlement_workplace_sign",
+
+                        x:
+                            placement.x,
+
+                        y:
+                            placement.y,
+
+                        depleted:
+                            false,
+
+                        regrowAtMinutes:
+                            null,
+
+                        state: {
+
+                            settlementId:
+                                settlement.id,
+
+                            workplaceId:
+                                placement.id,
+
+                            professionId:
+                                placement.professionId,
+
+                            workplaceName:
+                                placement.name,
+
+                            renderChar:
+                                placement.signChar
+                        },
+
+                        generatedChunkKey:
+                            chunkKey,
+
+                        settlementStructure:
+                            true
+                    });
+                }
+            }
+        }
+
+        for (
+            const placement
+            of settlement.housePlacements ?? []
+        ) {
+
+            const bounds =
+
+                placement.bounds ??
+
+                getSettlementHouseBounds(
+
+                    placement.x,
+                    placement.y
+                );
+
+
+            for (
+                let y = bounds.top;
+                y <= bounds.bottom;
+                y++
+            ) {
+
+                for (
+                    let x = bounds.left;
+                    x <= bounds.right;
+                    x++
+                ) {
+
+                    /*
+                        Bare materialiser celler som
+                        faktisk tilhører denne chunken.
+                    */
+
+                    if (
+                        getWorldChunkKeyAt(
+                            x,
+                            y
+                        ) !==
+                        chunkKey
+                    ) {
+
+                        continue;
+                    }
+
+
+                    const tile =
+                        getTile(
+                            x,
+                            y
+                        );
+
+
+                    if (!tile) {
+
+                        continue;
+                    }
+
+
+                    /*
+                        Hele footprintet får floor
+                        under seg.
+
+                        Dette fjerner trees/pines fra
+                        selve huset uten å lagre det
+                        som player terrain override.
+                    */
+
+                    tile.type =
+                        "houseFloor";
+
+                    tile.settlementId =
+                        settlement.id;
+
+
+                    const isBorder =
+
+                        x === bounds.left ||
+                        x === bounds.right ||
+                        y === bounds.top ||
+                        y === bounds.bottom;
+
+
+                    /*
+                        Interior består bare av
+                        walkable houseFloor.
+                    */
+
+                    if (!isBorder) {
+
+                        continue;
+                    }
+
+
+                    const isDoor =
+
+                        x === placement.doorX &&
+                        y === placement.doorY;
+
+
+                    const objectId =
+
+                        `${placement.id}_cell_${x}_${y}`;
+
+
+                    if (
+                        getWorldObjectById(
+                            objectId
+                        )
+                    ) {
+
+                        continue;
+                    }
+
+
+                    const objectType =
+
+                        isDoor
+
+                            ? "family_house_door"
+
+                            : "family_house_wall";
+
+
+                    const renderChar =
+
+                        isDoor
+
+                            ? "+"
+
+                            : getSettlementHouseWallChar(
+
+                                bounds,
+
+                                x,
+                                y
+                            );
+
+
+                    worldObjects.push({
+
+                        id:
+                            objectId,
+
+                        type:
+                            objectType,
+
+                        x,
+                        y,
+
+                        depleted:
+                            false,
+
+                        regrowAtMinutes:
+                            null,
+
+                        state: {
+
+                            settlementId:
+                                settlement.id,
+
+                            familyId:
+                                placement.familyId,
+
+                            houseId:
+                                placement.id,
+
+                            renderChar
+                        },
+
+                        generatedChunkKey:
+                            chunkKey,
+
+                        settlementStructure:
+                            true
+                    });
+                }
+            }
+        }
+    }
+
+
+    window.worldObjects =
+        worldObjects;
+}
+
+/* =========================================================
    DRAW SETTLEMENTS
 ========================================================= */
 
@@ -14887,19 +26038,91 @@ function assignStartingTraders(
         of settlements
     ) {
 
-        /*
-            Vi foretrekker household heads,
-            siden de allerede er notable residents.
-        */
+        assignStartingTraderForSettlement(
 
-        let candidates =
-            getNotableResidents(
-                settlement,
-                8
-            ).filter(
+            settlement,
+
+            random
+        );
+    }
+}
+
+
+function assignStartingTraderForSettlement(
+    settlement,
+    random
+) {
+
+    if (!settlement) {
+
+        return null;
+    }
+
+    const livingFamilies =
+
+        getLivingSettlementFamilies(
+            settlement
+        );
+
+
+    /*
+        En liten bosetning er foreløpig
+        for liten til å støtte en egen merchant.
+    */
+
+    if (
+        livingFamilies.length <
+        SETTLEMENT_DEVELOPMENT_RULES
+            .merchantMinFamilies
+    ) {
+
+        return null;
+    }
+
+    /*
+        Foretrekk household heads.
+    */
+
+    let candidates =
+
+        getNotableResidents(
+
+            settlement,
+
+            8
+        )
+
+        .filter(
+            person =>
+
+                person.alive &&
+
+                getPersonAge(
+                    person
+                ) >=
+                POPULATION_RULES
+                    .adulthoodAge
+        );
+
+
+    /*
+        Fallback:
+        hvilken som helst voksen.
+    */
+
+    if (
+        candidates.length ===
+        0
+    ) {
+
+        candidates =
+
+            getLivingSettlementResidents(
+                settlement
+            )
+
+            .filter(
                 person =>
-
-                    person.alive &&
 
                     getPersonAge(
                         person
@@ -14907,58 +26130,62 @@ function assignStartingTraders(
                     POPULATION_RULES
                         .adulthoodAge
             );
-
-
-        /*
-            Fallback.
-        */
-
-        if (
-            candidates.length === 0
-        ) {
-
-            candidates =
-                getLivingSettlementResidents(
-                    settlement
-                ).filter(
-                    person =>
-
-                        getPersonAge(
-                            person
-                        ) >=
-                        POPULATION_RULES
-                            .adulthoodAge
-                );
-        }
-
-
-        if (
-            candidates.length === 0
-        ) {
-
-            continue;
-        }
-
-
-        const merchant =
-
-            candidates[
-                Math.floor(
-                    random() *
-                    candidates.length
-                )
-            ];
-
-
-        setupStartingMerchant(
-
-            merchant,
-
-            settlement,
-
-            random
-        );
     }
+
+
+    if (
+        candidates.length ===
+        0
+    ) {
+
+        return null;
+    }
+
+
+    /*
+        Safety dersom funksjonen skulle
+        kjøres igjen senere.
+    */
+
+    const existingMerchant =
+
+        candidates.find(
+            person =>
+
+                person.profession ===
+                "merchant"
+        );
+
+
+    if (existingMerchant) {
+
+        return existingMerchant;
+    }
+
+
+    const merchant =
+
+        candidates[
+
+            Math.floor(
+
+                random() *
+                candidates.length
+            )
+        ];
+
+
+    setupStartingMerchant(
+
+        merchant,
+
+        settlement,
+
+        random
+    );
+
+
+    return merchant;
 }
 
 
@@ -15621,12 +26848,190 @@ function sellOneItemToNpc(
 }
 
 /* =========================================================
+   INFINITE SETTLEMENT POPULATION
+========================================================= */
+
+function getSettlementPopulationSeed(
+    settlement
+) {
+
+    return (
+
+        1 +
+
+        Math.floor(
+
+            WORLDGEN.hashNoise(
+
+                settlement.regionX ?? 0,
+                settlement.regionY ?? 0,
+
+                WORLD_SEED +
+                    84000
+            ) *
+
+            2147483646
+        )
+    );
+}
+
+
+function ensureInfiniteSettlementPopulation(
+    settlement
+) {
+
+    if (
+        !settlement ||
+        settlement.populationGenerated ===
+            true
+    ) {
+
+        return;
+    }
+
+
+    /*
+        Hvert settlement får sin egen seed.
+
+        Dermed bestemmes familier, navn,
+        alder osv. av settlementet selv,
+        ikke av hvilken rekkefølge spilleren
+        utforsker verden i.
+    */
+
+    const random =
+
+        createRandom(
+
+            getSettlementPopulationSeed(
+                settlement
+            )
+        );
+
+
+    /*
+        Finn hvor mange separate family homes
+        dette stedet faktisk har fysisk plass til.
+
+        Populationen får ikke lage flere familier
+        enn dette.
+    */
+
+    const houseCapacity =
+
+        Number.isFinite(
+            settlement.houseCapacity
+        )
+
+            ? Math.max(
+
+                0,
+
+                Math.floor(
+                    settlement.houseCapacity
+                )
+            )
+
+            : getSettlementHouseCapacity(
+                settlement
+            );
+
+
+    settlement.houseCapacity =
+        houseCapacity;
+
+    const startingFamilyTarget =
+
+        houseCapacity > 0
+
+            ? Math.max(
+
+                1,
+
+                Math.min(
+
+                    houseCapacity,
+
+                    Math.floor(
+
+                        settlement
+                            .startingFamilyTarget ??
+                        houseCapacity
+                    )
+                )
+            )
+
+            : 0;
+
+    generateSettlementPopulation(
+
+        settlement,
+
+        random,
+
+        {
+            stableIds:
+                true,
+
+            maxFamilies:
+                startingFamilyTarget
+        }
+    );
+
+
+    /*
+        Ett starting merchant.
+    */
+
+    assignStartingTraderForSettlement(
+
+        settlement,
+
+        random
+    );
+
+
+    /*
+        Fordel resten av voksne på jobs
+        basert på lokale resources.
+    */
+
+    fillSettlementProfessionVacancies(
+
+        settlement,
+
+        random
+    );
+
+
+    settlement.populationGenerated =
+        true;
+
+    settlement.populationLoaded =
+        true;
+
+    settlement.populationArchive =
+        null;
+
+
+    recalculatePopulationTotals();
+
+
+    window.families =
+        families;
+
+    window.people =
+        people;
+}
+
+/* =========================================================
    SETTLEMENT POPULATION
 ========================================================= */
 
 function generateSettlementPopulation(
     settlement,
-    random
+    random,
+    options = {}
 ) {
 
     /*
@@ -15647,6 +27052,23 @@ function generateSettlementPopulation(
             )
         );
 
+    const maxFamilies =
+
+        Number.isFinite(
+            options.maxFamilies
+        )
+
+            ? Math.max(
+
+                0,
+
+                Math.floor(
+                    options.maxFamilies
+                )
+            )
+
+            : Infinity;
+
 
     /*
         Fresh world generation.
@@ -15656,13 +27078,36 @@ function generateSettlementPopulation(
         [];
 
 
+    /*
+        Infinite settlements trenger IDs som
+        ikke avhenger av global generation order.
+    */
+
+    const idContext =
+
+        options.stableIds === true
+
+            ? {
+                familyIndex:
+                    1,
+
+                personIndex:
+                    1
+            }
+
+            : null;
+
+
     let generatedPopulation =
         0;
 
 
     while (
         generatedPopulation <
-        targetPopulation
+            targetPopulation &&
+
+        settlement.familyIds.length <
+            maxFamilies
     ) {
 
         const remaining =
@@ -15678,7 +27123,9 @@ function generateSettlementPopulation(
 
                 random,
 
-                remaining
+                remaining,
+
+                idContext
             );
 
 
@@ -15737,7 +27184,8 @@ function generateSettlementPopulation(
 function generateFamily(
     settlement,
     random,
-    maxSize
+    maxSize,
+    idContext = null
 ) {
 
     const surname =
@@ -15808,7 +27256,12 @@ function generateFamily(
     const family = {
 
         id:
-            `family_${families.length + 1}`,
+
+            idContext
+
+                ? `family_${settlement.id}_${idContext.familyIndex++}`
+
+                : `family_${families.length + 1}`,
 
         surname,
 
@@ -15863,9 +27316,16 @@ function generateFamily(
                     .startingAdultMaxAge
             );
 
-
         const person =
             createPerson({
+
+                id:
+
+                    idContext
+
+                        ? `person_${settlement.id}_${idContext.personIndex++}`
+
+                        : null,
 
                 surname,
 
@@ -15939,9 +27399,16 @@ function generateFamily(
                     .startingChildMaxAge
             );
 
-
         const person =
             createPerson({
+
+                id:
+
+                    idContext
+
+                        ? `person_${settlement.id}_${idContext.personIndex++}`
+
+                        : null,
 
                 surname,
 
@@ -16065,6 +27532,8 @@ function generateFamily(
 
 function createPerson({
 
+    id = null,
+
     surname,
     sex,
 
@@ -16114,6 +27583,8 @@ function createPerson({
     return {
 
         id:
+
+            id ??
             `person_${people.length + 1}`,
 
         firstName,
@@ -16196,6 +27667,56 @@ function createPerson({
             null,
 
         causeOfDeath:
+            null,
+
+
+        /* =========================================
+        PHYSICAL WORLD STATE
+        ========================================= */
+
+        char:
+            "p",
+
+        color:
+            "#f1d680",
+
+        worldX:
+            null,
+
+        worldY:
+            null,
+
+        physicalInitialized:
+            false,
+
+        homeInteriorX:
+            null,
+
+        homeInteriorY:
+            null,
+
+        workplaceId:
+            null,
+
+        workplaceProfessionId:
+            null,
+
+        workInteriorX:
+            null,
+
+        workInteriorY:
+            null,
+
+        workFieldX:
+            null,
+
+        workFieldY:
+            null,
+
+        npcPreviousX:
+            null,
+
+        npcPreviousY:
             null
     };
 }
@@ -16447,6 +27968,319 @@ function getFamilyById(
 }
 
 /* =========================================================
+   REGIONAL CIVILIZATION SIMULATION
+========================================================= */
+
+function getSettlementDistanceFromPlayer(
+    settlement
+) {
+
+    if (!settlement) {
+
+        return Infinity;
+    }
+
+
+    return getGridDistance(
+
+        player.x,
+        player.y,
+
+        settlement.x,
+        settlement.y
+    );
+}
+
+
+function isSettlementDetailedSimulationActive(
+    settlement
+) {
+
+    return (
+
+        getSettlementDistanceFromPlayer(
+            settlement
+        ) <=
+
+        CIVILIZATION_SIMULATION_RULES
+            .detailedRadius
+    );
+}
+
+
+function isPersonDetailedSimulationActive(
+    person
+) {
+
+    if (!person) {
+
+        return false;
+    }
+
+
+    const settlement =
+        getSettlementById(
+            person.settlementId
+        );
+
+
+    return (
+
+        settlement &&
+
+        settlement.populationLoaded !==
+            false &&
+
+        isSettlementDetailedSimulationActive(
+            settlement
+        )
+    );
+}
+
+
+/* =========================================================
+   ARCHIVE DISTANT POPULATION
+========================================================= */
+
+function archiveSettlementPopulation(
+    settlement
+) {
+
+    if (
+        !settlement ||
+
+        settlement.populationLoaded ===
+            false ||
+
+        !settlement.populationGenerated
+    ) {
+
+        return;
+    }
+
+
+    const familyIds =
+        new Set(
+            settlement.familyIds
+        );
+
+
+    const archivedPeople =
+
+        people.filter(
+            person =>
+
+                person.settlementId ===
+                settlement.id
+        );
+
+
+    const archivedFamilies =
+
+        families.filter(
+            family =>
+
+                familyIds.has(
+                    family.id
+                )
+        );
+
+
+    /*
+        Behold lightweight population count
+        på selve settlementet.
+    */
+
+    settlement.population =
+
+        archivedPeople.filter(
+            person =>
+                person.alive
+        ).length;
+
+
+    settlement.populationArchive = {
+
+        people:
+            archivedPeople,
+
+        families:
+            archivedFamilies
+    };
+
+
+    /*
+        Fjern dem fra de aktive globale arrays.
+    */
+
+    people =
+
+        people.filter(
+            person =>
+
+                person.settlementId !==
+                settlement.id
+        );
+
+
+    families =
+
+        families.filter(
+            family =>
+
+                !familyIds.has(
+                    family.id
+                )
+        );
+
+
+    settlement.populationLoaded =
+        false;
+
+
+    window.people =
+        people;
+
+    window.families =
+        families;
+}
+
+
+/* =========================================================
+   RESTORE NEARBY POPULATION
+========================================================= */
+
+function restoreSettlementPopulation(
+    settlement
+) {
+
+    if (!settlement) {
+
+        return;
+    }
+
+
+    /*
+        Settlement som aldri har fått
+        population enda.
+    */
+
+    if (
+        !settlement.populationGenerated
+    ) {
+
+        ensureInfiniteSettlementPopulation(
+            settlement
+        );
+
+        return;
+    }
+
+
+    if (
+        settlement.populationLoaded !==
+        false
+    ) {
+
+        return;
+    }
+
+
+    const archive =
+        settlement.populationArchive;
+
+
+    if (!archive) {
+
+        return;
+    }
+
+
+    for (
+        const family
+        of archive.families ?? []
+    ) {
+
+        if (
+            !getFamilyById(
+                family.id
+            )
+        ) {
+
+            families.push(
+                family
+            );
+        }
+    }
+
+
+    for (
+        const person
+        of archive.people ?? []
+    ) {
+
+        if (
+            !getPersonById(
+                person.id
+            )
+        ) {
+
+            people.push(
+                person
+            );
+        }
+    }
+
+
+    settlement.populationArchive =
+        null;
+
+    settlement.populationLoaded =
+        true;
+
+
+    window.people =
+        people;
+
+    window.families =
+        families;
+
+
+    recalculatePopulationTotals();
+}
+
+
+/* =========================================================
+   SYNC CIVILIZATION RANGE
+========================================================= */
+
+function syncCivilizationSimulationRange() {
+
+    for (
+        const settlement
+        of settlements
+    ) {
+
+        if (
+            isSettlementDetailedSimulationActive(
+                settlement
+            )
+        ) {
+
+            restoreSettlementPopulation(
+                settlement
+            );
+
+        } else {
+
+            archiveSettlementPopulation(
+                settlement
+            );
+        }
+    }
+}
+
+/* =========================================================
    POPULATION DAILY SIMULATION
 ========================================================= */
 
@@ -16464,7 +28298,11 @@ function simulatePopulationDay(
     ) {
 
         if (
-            !person.alive
+            !person.alive ||
+
+            !isPersonDetailedSimulationActive(
+                person
+            )
         ) {
 
             continue;
@@ -17186,9 +29024,15 @@ function simulatePopulationMonth(
     */
 
     const livingPeople =
+
         people.filter(
             person =>
-                person.alive
+
+                person.alive &&
+
+                isPersonDetailedSimulationActive(
+                    person
+                )
         );
 
 
@@ -17587,7 +29431,12 @@ function simulatePregnanciesDay(
             person =>
 
                 person.alive &&
-                person.pregnancy
+
+                person.pregnancy &&
+
+                isPersonDetailedSimulationActive(
+                    person
+                )
         );
 
 
@@ -17805,13 +29654,27 @@ function giveBirth(
 
 function recalculatePopulationTotals() {
 
+    /*
+        Bare loaded settlements regnes
+        på nytt fra people[].
+
+        Dormant settlements beholder sin
+        lagrede aggregate population.
+    */
+
     for (
         const settlement
         of settlements
     ) {
 
-        settlement.population =
-            0;
+        if (
+            settlement.populationLoaded !==
+            false
+        ) {
+
+            settlement.population =
+                0;
+        }
     }
 
 
@@ -17844,27 +29707,48 @@ function recalculatePopulationTotals() {
             );
 
 
-        if (
-            settlement
-        ) {
+        if (settlement) {
 
             settlement.population++;
+        }
+    }
+
+
+    /*
+        Future-proofing for factions:
+
+        faction population bygges fra
+        settlement totals, også når settlements
+        er dormant.
+    */
+
+    for (
+        const settlement
+        of settlements
+    ) {
+
+        if (
+            !settlement.factionId
+        ) {
+
+            continue;
         }
 
 
         const faction =
             getFactionById(
-                person.factionId
+                settlement.factionId
             );
 
 
-        if (
-            faction
-        ) {
+        if (faction) {
 
-            faction.population++;
+            faction.population +=
+                settlement.population;
         }
     }
+
+    refreshAllInfiniteFactionPopulations();
 }
 
 /* =========================================================
@@ -17873,147 +29757,420 @@ function recalculatePopulationTotals() {
 
 function findPlayerSpawn() {
 
-    const centerX =
-        Math.floor(
-            WORLD_WIDTH / 2
-        );
-
-    const centerY =
-        Math.floor(
-            WORLD_HEIGHT / 2
-        );
-
-
-    let bestTile = null;
-
-    let bestDistance =
-        Infinity;
-
-
     /*
-        Først leter vi etter fine,
-        åpne land-tiles.
+        Først søker vi detaljert rundt world origin.
+
+        Dersom 0,0 ligger midt ute i havet,
+        gjør vi deretter et billig coarse search
+        mye lenger utover.
     */
 
-    for (
-        let y = 0;
-        y < WORLD_HEIGHT;
-        y++
+    const LOCAL_SEARCH_RADIUS =
+        160;
+
+    const DISTANT_SEARCH_RADIUS =
+        8192;
+
+    const DISTANT_SEARCH_STEP =
+        64;
+
+    const REFINEMENT_RADIUS =
+        64;
+
+
+    function isPreferredSpawnTerrain(
+        tile
     ) {
 
-        for (
-            let x = 0;
-            x < WORLD_WIDTH;
-            x++
+        if (!tile) {
+
+            return false;
+        }
+
+
+        return (
+
+            tile.type === "grass" ||
+
+            tile.type === "grassDark" ||
+
+            tile.type === "dryGrass" ||
+
+            tile.type === "tundra"
+        );
+    }
+
+
+    function getValidSpawnTile(
+        x,
+        y
+    ) {
+
+        const tile =
+            getTile(
+                x,
+                y
+            );
+
+
+        if (
+            !tile ||
+            tile.river
         ) {
 
-            const tile =
-                world[y][x];
-
-            if (
-                tile.river
-            ) {
-
-                continue;
-            }
-
-            const goodTerrain =
-                tile.type === "grass" ||
-                tile.type === "grassDark" ||
-                tile.type === "dryGrass" ||
-                tile.type === "tundra";
-
-
-            if (!goodTerrain) {
-                continue;
-            }
-
-
-            const distance =
-                Math.abs(
-                    x - centerX
-                ) +
-                Math.abs(
-                    y - centerY
-                );
-
-
-            if (
-                distance <
-                bestDistance
-            ) {
-
-                bestDistance =
-                    distance;
-
-                bestTile = {
-                    x,
-                    y
-                };
-            }
+            return null;
         }
+
+
+        const definition =
+            TILES[
+                tile.type
+            ];
+
+
+        if (
+            !definition ||
+            definition.walkable !==
+                true
+        ) {
+
+            return null;
+        }
+
+
+        return tile;
     }
 
 
     /*
-        Fallback:
-        hvilken som helst walkable tile.
+        Detaljert søk rundt et bestemt punkt.
+
+        Vi foretrekker grassland/tundra osv.,
+        men beholder første walkable tile som
+        fallback.
     */
 
-    if (!bestTile) {
+    function findSpawnNear(
+        centerX,
+        centerY,
+        radius
+    ) {
+
+        let fallback =
+            null;
+
 
         for (
-            let y = 0;
-            y < WORLD_HEIGHT;
-            y++
+            let searchRadius = 0;
+
+            searchRadius <= radius;
+
+            searchRadius++
         ) {
 
             for (
-                let x = 0;
-                x < WORLD_WIDTH;
-                x++
+                let offsetY =
+                    -searchRadius;
+
+                offsetY <=
+                    searchRadius;
+
+                offsetY++
             ) {
 
-                if (
-                    isWalkable(
-                        x,
-                        y
-                    )
+                for (
+                    let offsetX =
+                        -searchRadius;
+
+                    offsetX <=
+                        searchRadius;
+
+                    offsetX++
                 ) {
 
-                    bestTile = {
-                        x,
-                        y
-                    };
+                    /*
+                        Bare kanten av ringen.
+                    */
 
-                    break;
+                    if (
+                        Math.max(
+
+                            Math.abs(
+                                offsetX
+                            ),
+
+                            Math.abs(
+                                offsetY
+                            )
+
+                        ) !==
+                        searchRadius
+                    ) {
+
+                        continue;
+                    }
+
+
+                    const x =
+                        centerX +
+                        offsetX;
+
+                    const y =
+                        centerY +
+                        offsetY;
+
+
+                    const tile =
+                        getValidSpawnTile(
+                            x,
+                            y
+                        );
+
+
+                    if (!tile) {
+
+                        continue;
+                    }
+
+
+                    if (!fallback) {
+
+                        fallback = {
+                            x,
+                            y
+                        };
+                    }
+
+
+                    if (
+                        isPreferredSpawnTerrain(
+                            tile
+                        )
+                    ) {
+
+                        return {
+                            x,
+                            y
+                        };
+                    }
                 }
             }
+        }
 
 
-            if (bestTile) {
-                break;
+        return fallback;
+    }
+
+
+    /*
+        1. Prøv først området rundt 0,0.
+    */
+
+    let spawn =
+        findSpawnNear(
+
+            0,
+            0,
+
+            LOCAL_SEARCH_RADIUS
+        );
+
+
+    /*
+        2. Hvis world origin ligger langt ute i
+           havet, scan verdenen i store steg.
+
+           sampleTerrain genererer IKKE chunks,
+           så dette er mye billigere enn å bruke
+           getTile() på tusenvis av punkter.
+    */
+
+    if (!spawn) {
+
+        const maxGridRadius =
+
+            Math.ceil(
+
+                DISTANT_SEARCH_RADIUS /
+
+                DISTANT_SEARCH_STEP
+            );
+
+
+        const startingGridRadius =
+
+            Math.ceil(
+
+                (
+                    LOCAL_SEARCH_RADIUS +
+                    1
+                ) /
+
+                DISTANT_SEARCH_STEP
+            );
+
+
+        search:
+        for (
+            let gridRadius =
+                startingGridRadius;
+
+            gridRadius <=
+                maxGridRadius;
+
+            gridRadius++
+        ) {
+
+            for (
+                let gridY =
+                    -gridRadius;
+
+                gridY <=
+                    gridRadius;
+
+                gridY++
+            ) {
+
+                for (
+                    let gridX =
+                        -gridRadius;
+
+                    gridX <=
+                        gridRadius;
+
+                    gridX++
+                ) {
+
+                    /*
+                        Bare kanten av search-ringen.
+                    */
+
+                    if (
+                        Math.max(
+
+                            Math.abs(
+                                gridX
+                            ),
+
+                            Math.abs(
+                                gridY
+                            )
+
+                        ) !==
+                        gridRadius
+                    ) {
+
+                        continue;
+                    }
+
+
+                    const sampleX =
+
+                        gridX *
+
+                        DISTANT_SEARCH_STEP;
+
+
+                    const sampleY =
+
+                        gridY *
+
+                        DISTANT_SEARCH_STEP;
+
+
+                    const sample =
+
+                        WORLDGEN.sampleTerrain(
+
+                            sampleX,
+                            sampleY,
+
+                            WORLD_SEED
+                        );
+
+
+                    if (!sample) {
+
+                        continue;
+                    }
+
+
+                    const definition =
+
+                        TILES[
+                            sample.type
+                        ];
+
+
+                    /*
+                        Ikke generer en ekte chunk før
+                        vi vet at området faktisk
+                        inneholder walkable land.
+                    */
+
+                    if (
+                        !definition ||
+
+                        definition.walkable !==
+                            true
+                    ) {
+
+                        continue;
+                    }
+
+
+                    /*
+                        Vi fant land.
+
+                        Nå gjør vi et ordentlig søk
+                        rundt dette punktet slik at
+                        spilleren ikke nødvendigvis
+                        starter på stranden.
+                    */
+
+                    spawn =
+
+                        findSpawnNear(
+
+                            sampleX,
+                            sampleY,
+
+                            REFINEMENT_RADIUS
+                        );
+
+
+                    if (spawn) {
+
+                        break search;
+                    }
+                }
             }
         }
     }
 
 
-    if (!bestTile) {
+    if (!spawn) {
 
         throw new Error(
-            "Generated world contains no valid player spawn."
+
+            "Could not find a valid player spawn in the searched world area."
         );
     }
 
 
     player.x =
-        bestTile.x;
+        spawn.x;
 
     player.y =
-        bestTile.y;
+        spawn.y;
 
 
-    clearSpawnArea();
+    /*
+        Først NÅ laster vi de aktive chunkene
+        rundt den faktiske spawn-posisjonen.
+    */
+
+    ensureActiveWorldChunks();
 }
 
 function clearSpawnArea() {
@@ -18117,7 +30274,199 @@ function clearSpawnArea() {
    CREATURE GENERATION
 ========================================================= */
 
-function spawnCreatures(seed) {
+function canCreatureSpawnAt(
+    definition,
+    x,
+    y
+) {
+
+    if (
+        !definition ||
+        !isInsideWorld(
+            x,
+            y
+        )
+    ) {
+
+        return false;
+    }
+
+
+    const tile =
+        getTile(
+            x,
+            y
+        );
+
+
+    if (
+        tile.settlementId !==
+        null
+    ) {
+
+        return false;
+    }
+
+
+    if (
+        !isWalkable(
+            x,
+            y
+        )
+    ) {
+
+        return false;
+    }
+
+
+    if (
+        getCreatureAt(
+            x,
+            y
+        )
+    ) {
+
+        return false;
+    }
+
+
+    if (
+        x === player.x &&
+        y === player.y
+    ) {
+
+        return false;
+    }
+
+
+    const spawn =
+        definition.spawn ??
+        {};
+
+
+    if (
+        spawn.biomes.length > 0 &&
+        !spawn.biomes.includes(
+            tile.biome
+        )
+    ) {
+
+        return false;
+    }
+
+
+    if (
+        spawn.tileTypes.length > 0 &&
+        !spawn.tileTypes.includes(
+            tile.type
+        )
+    ) {
+
+        return false;
+    }
+
+
+    return true;
+}
+
+
+function createCreature(
+    creatureType,
+    x,
+    y,
+    options = {}
+) {
+
+    const definition =
+        getCreatureDefinition(
+            creatureType
+        );
+
+
+    if (!definition) {
+
+        return null;
+    }
+
+
+    const creature = {
+
+        id:
+
+            options.id ??
+
+            `creature_${creatures.length + 1}`,
+
+        type:
+            creatureType,
+
+        name:
+            definition.name,
+
+        x,
+        y,
+
+        char:
+            definition.char,
+
+        color:
+            definition.color,
+
+        hp:
+
+            Math.max(
+
+                0,
+
+                Math.min(
+
+                    definition.maxHp,
+
+                    Number(
+                        options.hp ??
+                        definition.maxHp
+                    )
+                )
+            ),
+
+        maxHp:
+            definition.maxHp,
+
+        behavior:
+            definition.behavior,
+
+        detectionRange:
+            definition.detectionRange,
+
+        moveChance:
+            definition.moveChance,
+
+        alive:
+            true,
+
+        generatedChunkKey:
+
+            options.generatedChunkKey ??
+            null
+    };
+
+
+    creatures.push(
+        creature
+    );
+
+
+    window.creatures =
+        creatures;
+
+
+    return creature;
+}
+
+
+function spawnCreatures(
+    seed
+) {
 
     const random =
         createRandom(
@@ -18125,253 +30474,100 @@ function spawnCreatures(seed) {
         );
 
 
-    creatures = [];
-
-
-    /*
-        ============================================
-        RANDOM WORLD SPIDERS
-        ============================================
-    */
-
-    const SPIDER_COUNT = 25;
+    creatures =
+        [];
 
 
     for (
-        let i = 0;
-        i < SPIDER_COUNT;
-        i++
+        const definition
+        of CREATURE_DEFINITIONS.values()
     ) {
 
-        let spawnX = null;
-        let spawnY = null;
+        const targetCount =
+            definition.spawn.count;
 
-
-        /*
-            Prøv å finne en gyldig tile.
-
-            Hvis vi ikke finner en, lager vi
-            ganske enkelt ikke denne spideren.
-        */
 
         for (
-            let attempt = 0;
-            attempt < 300;
-            attempt++
+            let i = 0;
+            i < targetCount;
+            i++
         ) {
 
-            const x =
-                Math.floor(
-                    random() *
-                    WORLD_WIDTH
-                );
+            let spawnX =
+                null;
+
+            let spawnY =
+                null;
 
 
-            const y =
-                Math.floor(
-                    random() *
-                    WORLD_HEIGHT
-                );
+            for (
+                let attempt = 0;
+                attempt < 400;
+                attempt++
+            ) {
+
+                const x =
+                    Math.floor(
+                        random() *
+                        WORLD_WIDTH
+                    );
+
+
+                const y =
+                    Math.floor(
+                        random() *
+                        WORLD_HEIGHT
+                    );
+
+
+                if (
+                    !canCreatureSpawnAt(
+                        definition,
+                        x,
+                        y
+                    )
+                ) {
+
+                    continue;
+                }
+
+
+                spawnX =
+                    x;
+
+                spawnY =
+                    y;
+
+                break;
+            }
 
 
             if (
-                !isWalkable(
-                    x,
-                    y
-                )
+                spawnX === null ||
+                spawnY === null
             ) {
 
                 continue;
             }
 
 
-            if (
-                getCreatureAt(
-                    x,
-                    y
-                )
-            ) {
+            createCreature(
 
-                continue;
-            }
+                definition.id,
 
-
-            /*
-                Ikke spawn rett på spilleren.
-            */
-
-            if (
-                x === player.x &&
-                y === player.y
-            ) {
-
-                continue;
-            }
-
-
-            spawnX = x;
-            spawnY = y;
-
-            break;
+                spawnX,
+                spawnY
+            );
         }
-
-
-        /*
-            Fant ingen gyldig plass.
-        */
-
-        if (
-            spawnX === null ||
-            spawnY === null
-        ) {
-
-            continue;
-        }
-
-
-        creatures.push({
-
-            type: "spider",
-
-            x: spawnX,
-            y: spawnY,
-
-            char: "s",
-            color: "#d34f4f",
-
-            hp: 5,
-
-            alive: true
-        });
     }
 
 
-    /*
-        ============================================
-        ONE TEST SPIDER NEAR PLAYER
-        ============================================
-
-        Vi beholder én spider i nærheten slik at
-        vi enkelt kan teste AI senere.
-
-        MEN posisjonen bestemmes av seed-en og
-        må være en gyldig walkable tile.
-    */
-
-    spawnNearbySpider(
-        random
-    );
-}
-
-function spawnNearbySpider(
-    random
-) {
-
-    /*
-        Søk i området 5–12 tiles fra spilleren.
-    */
-
-    for (
-        let attempt = 0;
-        attempt < 200;
-        attempt++
-    ) {
-
-        const offsetX =
-            Math.floor(
-                random() * 25
-            ) - 12;
+    window.creatures =
+        creatures;
 
 
-        const offsetY =
-            Math.floor(
-                random() * 25
-            ) - 12;
-
-
-        const distance =
-            Math.abs(offsetX) +
-            Math.abs(offsetY);
-
-
-        /*
-            Ikke for nær spilleren.
-        */
-
-        if (
-            distance < 5 ||
-            distance > 12
-        ) {
-
-            continue;
-        }
-
-
-        const x =
-            player.x +
-            offsetX;
-
-
-        const y =
-            player.y +
-            offsetY;
-
-
-        if (
-            !isInsideWorld(
-                x,
-                y
-            )
-        ) {
-
-            continue;
-        }
-
-
-        if (
-            !isWalkable(
-                x,
-                y
-            )
-        ) {
-
-            continue;
-        }
-
-
-        if (
-            getCreatureAt(
-                x,
-                y
-            )
-        ) {
-
-            continue;
-        }
-
-
-        creatures.push({
-
-            type: "spider",
-
-            x,
-            y,
-
-            char: "s",
-            color: "#d34f4f",
-
-            hp: 5,
-
-            alive: true
-        });
-
-
-        return;
-    }
-
-
-    console.warn(
-        "Could not find valid nearby spider spawn."
+    console.log(
+        `Spawned ${creatures.length} creatures.`
     );
 }
 
@@ -18382,11 +30578,15 @@ function spawnNearbySpider(
 
 function isInsideWorld(x, y) {
 
+    /*
+        Infinite world:
+        negative og positive coordinates
+        er gyldige.
+    */
+
     return (
-        x >= 0 &&
-        y >= 0 &&
-        x < WORLD_WIDTH &&
-        y < WORLD_HEIGHT
+        Number.isInteger(x) &&
+        Number.isInteger(y)
     );
 }
 
@@ -18394,10 +30594,59 @@ function isInsideWorld(x, y) {
 function getTile(x, y) {
 
     if (!isInsideWorld(x, y)) {
+
         return null;
     }
 
-    return world[y][x];
+
+    const tile =
+        WORLDGEN.getTile(
+            x,
+            y,
+            WORLD_SEED
+        );
+
+
+    return applyTerrainOverride(
+        tile
+    );
+}
+
+
+function ensureActiveWorldChunks() {
+
+    /*
+        Terrain.
+    */
+
+    WORLDGEN.ensureChunksAround(
+        player.x,
+        player.y,
+        WORLD_SEED
+    );
+
+
+    /*
+        Nature / creatures / settlements.
+    */
+
+    syncActiveChunkContent();
+
+
+    /*
+        Bare nearby civilization bruker
+        full NPC simulation.
+    */
+
+    syncCivilizationSimulationRange();
+
+
+    /*
+        Personer i nearby settlements får
+        faktisk world-position.
+    */
+
+    syncPhysicalSettlementNpcs();
 }
 
 
@@ -18469,6 +30718,60 @@ function isWalkable(x, y) {
     );
 }
 
+/* =========================================================
+   WILD CREATURE PERSISTENCE
+========================================================= */
+
+function saveWildCreatureState(
+    creature
+) {
+
+    if (
+        !creature ||
+        !String(
+            creature.id
+        ).startsWith(
+            "wild_"
+        )
+    ) {
+
+        return;
+    }
+
+
+    wildCreatureStates.set(
+
+        creature.id,
+
+        {
+            alive:
+                creature.alive !==
+                false,
+
+            hp:
+                creature.hp,
+
+            x:
+                creature.x,
+
+            y:
+                creature.y
+        }
+    );
+}
+
+
+function getWildCreatureState(
+    creatureId
+) {
+
+    return (
+        wildCreatureStates.get(
+            creatureId
+        ) ??
+        null
+    );
+}
 
 /* =========================================================
    CREATURE HELPERS
@@ -18483,6 +30786,746 @@ function getCreatureAt(x, y) {
     );
 }
 
+function getCreatureById(
+    creatureId
+) {
+
+    return (
+
+        creatures.find(
+            creature =>
+                creature.id ===
+                creatureId
+        ) ||
+
+        null
+    );
+}
+
+function canCreatureMoveTo(
+    creature,
+    x,
+    y
+) {
+
+    if (
+        !creature ||
+        !isInsideWorld(
+            x,
+            y
+        )
+    ) {
+
+        return false;
+    }
+
+
+    if (
+        !isWalkable(
+            x,
+            y
+        )
+    ) {
+
+        return false;
+    }
+
+
+    if (
+        getCreatureAt(
+            x,
+            y
+        )
+    ) {
+
+        return false;
+    }
+
+
+    /*
+        Dyr går ikke gjennom settlement residents.
+    */
+
+    if (
+        getPhysicalPersonAt(
+            x,
+            y
+        )
+    ) {
+
+        return false;
+    }
+
+
+    if (
+        x === player.x &&
+        y === player.y
+    ) {
+
+        return false;
+    }
+
+
+    const definition =
+        getCreatureDefinition(
+            creature.type
+        );
+
+
+    if (!definition) {
+
+        return false;
+    }
+
+
+    const tile =
+        getTile(
+            x,
+            y
+        );
+
+
+    /*
+        Dyr prøver å holde seg i områder de
+        naturlig hører hjemme i.
+
+        Vi lar dem likevel gå mellom gyldige
+        tileTypes innenfor biome-listen.
+    */
+
+    if (
+        definition.spawn.biomes.length > 0 &&
+        !definition.spawn.biomes.includes(
+            tile.biome
+        )
+    ) {
+
+        return false;
+    }
+
+
+    return true;
+}
+
+
+function moveCreature(
+    creature,
+    dx,
+    dy
+) {
+
+    const targetX =
+        creature.x +
+        dx;
+
+    const targetY =
+        creature.y +
+        dy;
+
+
+    if (
+        !canCreatureMoveTo(
+            creature,
+            targetX,
+            targetY
+        )
+    ) {
+
+        return false;
+    }
+
+
+    creature.x =
+        targetX;
+
+    creature.y =
+        targetY;
+
+
+    return true;
+}
+
+function moveCreatureAwayFromPlayer(
+    creature
+) {
+
+    const directions = [
+
+        { x: -1, y: -1 },
+        { x:  0, y: -1 },
+        { x:  1, y: -1 },
+
+        { x: -1, y:  0 },
+        { x:  1, y:  0 },
+
+        { x: -1, y:  1 },
+        { x:  0, y:  1 },
+        { x:  1, y:  1 }
+    ];
+
+
+    const currentDistance =
+
+        Math.abs(
+            player.x -
+            creature.x
+        ) +
+
+        Math.abs(
+            player.y -
+            creature.y
+        );
+
+
+    let bestMoves =
+        [];
+
+    let bestDistance =
+        currentDistance;
+
+
+    for (
+        const direction
+        of directions
+    ) {
+
+        const targetX =
+            creature.x +
+            direction.x;
+
+        const targetY =
+            creature.y +
+            direction.y;
+
+
+        if (
+            !canCreatureMoveTo(
+                creature,
+                targetX,
+                targetY
+            )
+        ) {
+
+            continue;
+        }
+
+
+        const distance =
+
+            Math.abs(
+                player.x -
+                targetX
+            ) +
+
+            Math.abs(
+                player.y -
+                targetY
+            );
+
+
+        if (
+            distance >
+            bestDistance
+        ) {
+
+            bestDistance =
+                distance;
+
+            bestMoves = [
+                direction
+            ];
+
+        } else if (
+            distance ===
+            bestDistance
+        ) {
+
+            bestMoves.push(
+                direction
+            );
+        }
+    }
+
+
+    if (
+        bestMoves.length === 0
+    ) {
+
+        return false;
+    }
+
+
+    const move =
+
+        bestMoves[
+            Math.floor(
+                simulationRandom() *
+                bestMoves.length
+            )
+        ];
+
+
+    return moveCreature(
+        creature,
+        move.x,
+        move.y
+    );
+}
+
+function wanderCreature(
+    creature
+) {
+
+    const directions = [
+
+        { x:  0, y: -1 },
+        { x:  1, y:  0 },
+        { x:  0, y:  1 },
+        { x: -1, y:  0 },
+
+        { x: -1, y: -1 },
+        { x:  1, y: -1 },
+        { x:  1, y:  1 },
+        { x: -1, y:  1 }
+    ];
+
+
+    /*
+        Ikke beveg creature hver eneste turn.
+    */
+
+    if (
+        simulationRandom() >
+        creature.moveChance
+    ) {
+
+        return false;
+    }
+
+
+    const startIndex =
+        Math.floor(
+            simulationRandom() *
+            directions.length
+        );
+
+
+    for (
+        let i = 0;
+        i < directions.length;
+        i++
+    ) {
+
+        const direction =
+
+            directions[
+                (
+                    startIndex + i
+                ) %
+                directions.length
+            ];
+
+
+        if (
+            moveCreature(
+
+                creature,
+
+                direction.x,
+                direction.y
+            )
+        ) {
+
+            return true;
+        }
+    }
+
+
+    return false;
+}
+
+function moveCreatureTowardPlayer(
+    creature
+) {
+
+    const dx =
+        player.x -
+        creature.x;
+
+    const dy =
+        player.y -
+        creature.y;
+
+
+    const options =
+        [];
+
+
+    if (
+        dx !== 0
+    ) {
+
+        options.push({
+
+            x:
+                Math.sign(
+                    dx
+                ),
+
+            y:
+                0
+        });
+    }
+
+
+    if (
+        dy !== 0
+    ) {
+
+        options.push({
+
+            x:
+                0,
+
+            y:
+                Math.sign(
+                    dy
+                )
+        });
+    }
+
+
+    /*
+        Prøv først aksen med størst avstand.
+    */
+
+    options.sort(
+        (
+            a,
+            b
+        ) => {
+
+            const distanceA =
+
+                Math.abs(
+                    dx * a.x
+                ) +
+
+                Math.abs(
+                    dy * a.y
+                );
+
+
+            const distanceB =
+
+                Math.abs(
+                    dx * b.x
+                ) +
+
+                Math.abs(
+                    dy * b.y
+                );
+
+
+            return (
+                distanceB -
+                distanceA
+            );
+        }
+    );
+
+
+    for (
+        const move
+        of options
+    ) {
+
+        if (
+            moveCreature(
+                creature,
+                move.x,
+                move.y
+            )
+        ) {
+
+            return true;
+        }
+    }
+
+
+    return false;
+}
+
+/* =========================================================
+   PLAYER COMBAT
+========================================================= */
+
+function getPlayerAttackDamage() {
+
+    const weapon =
+        getEquippedItem(
+            "weapon"
+        );
+
+
+    /*
+        Fists.
+    */
+
+    if (!weapon) {
+
+        return 1;
+    }
+
+
+    return Math.max(
+        1,
+        Number(
+            weapon.damage ??
+            1
+        )
+    );
+}
+
+
+function getPlayerAttackName() {
+
+    const weapon =
+        getEquippedItem(
+            "weapon"
+        );
+
+
+    return weapon
+        ? weapon.name
+        : "Fists";
+}
+
+
+function canPlayerAttackCreature(
+    creature
+) {
+
+    if (
+        !creature ||
+        !creature.alive
+    ) {
+
+        return false;
+    }
+
+
+    const dx =
+        Math.abs(
+            creature.x -
+            player.x
+        );
+
+    const dy =
+        Math.abs(
+            creature.y -
+            player.y
+        );
+
+
+    /*
+        Foreløpig melee / adjacent combat.
+
+        Diagonals teller også som adjacent.
+    */
+
+    return (
+        dx <= 1 &&
+        dy <= 1 &&
+        !(
+            dx === 0 &&
+            dy === 0
+        )
+    );
+}
+
+function createCreatureCarcass(
+    creature
+) {
+
+    if (!creature) {
+
+        return null;
+    }
+
+
+    const definition =
+        getCreatureDefinition(
+            creature.type
+        );
+
+
+    if (
+        !definition ||
+        !definition.carcassType
+    ) {
+
+        return null;
+    }
+
+
+    /*
+        Forsøk først nøyaktig der dyret døde.
+    */
+
+    const positions = [
+
+        {
+            x:
+                creature.x,
+
+            y:
+                creature.y
+        },
+
+        { x: creature.x,     y: creature.y - 1 },
+        { x: creature.x + 1, y: creature.y     },
+        { x: creature.x,     y: creature.y + 1 },
+        { x: creature.x - 1, y: creature.y     },
+
+        { x: creature.x - 1, y: creature.y - 1 },
+        { x: creature.x + 1, y: creature.y - 1 },
+        { x: creature.x + 1, y: creature.y + 1 },
+        { x: creature.x - 1, y: creature.y + 1 }
+    ];
+
+
+    for (
+        const position
+        of positions
+    ) {
+
+        if (
+            !canPlaceWorldObjectAt(
+
+                definition.carcassType,
+
+                position.x,
+                position.y
+            )
+        ) {
+
+            continue;
+        }
+
+
+        return createPlacedWorldObject(
+
+            definition.carcassType,
+
+            position.x,
+            position.y
+        );
+    }
+
+
+    return null;
+}
+
+function attackCreature(
+    creature
+) {
+
+    if (
+        !canPlayerAttackCreature(
+            creature
+        )
+    ) {
+
+        addLog(
+            "The creature is too far away."
+        );
+
+        return false;
+    }
+
+
+    const damage =
+        getPlayerAttackDamage();
+
+
+    const weaponName =
+        getPlayerAttackName();
+
+
+    creature.hp =
+
+        Math.max(
+            0,
+
+            creature.hp -
+            damage
+        );
+
+
+    addLog(
+
+        `You attack the ${creature.name.toLowerCase()} with ${weaponName} for ${damage} damage.`
+    );
+
+    saveWildCreatureState(
+        creature
+    );
+
+    /*
+        Creature dies.
+    */
+
+    if (
+        creature.hp <= 0
+    ) {
+
+        creature.alive =
+            false;
+
+
+        addLog(
+
+            `The ${creature.name.toLowerCase()} dies.`
+        );
+
+        saveWildCreatureState(
+            creature
+        );
+
+        const carcass =
+            createCreatureCarcass(
+                creature
+            );
+
+
+        if (carcass) {
+
+            const carcassDefinition =
+                getWorldObjectDefinition(
+                    carcass.type
+                );
+
+
+            if (carcassDefinition) {
+
+                addLog(
+
+                    `The ${creature.name.toLowerCase()} leaves behind a ${carcassDefinition.name.toLowerCase()}.`
+                );
+            }
+        }
+    }
+
+
+    finishTurn(
+        "attack",
+        1
+    );
+
+
+    return true;
+}
 
 /* =========================================================
    PLAYER MOVEMENT
@@ -18492,7 +31535,6 @@ function tryMovePlayer(dx, dy) {
 
     const targetX = player.x + dx;
     const targetY = player.y + dy;
-
 
     /*
         Creature på target tile.
@@ -18505,7 +31547,8 @@ function tryMovePlayer(dx, dy) {
     if (creature) {
 
         addLog(
-            `A ${creature.type} blocks your path.`
+
+            `A ${creature.name.toLowerCase()} blocks your path.`
         );
 
         return;
@@ -18553,6 +31596,9 @@ function tryMovePlayer(dx, dy) {
 
     player.y =
         targetY;
+
+
+    ensureActiveWorldChunks();
 
 
     notifyPlayerPositionChanged(
@@ -18625,6 +31671,14 @@ function finishTurn(
     updateCreatures();
 
 
+    /*
+        Nearby settlement residents får
+        også én simulation update.
+    */
+
+    updatePhysicalSettlementNpcs();
+
+
     updateUI();
 
     render();
@@ -18637,87 +31691,139 @@ function finishTurn(
 
 function updateCreatures() {
 
-    for (const creature of creatures) {
+    for (
+        const creature
+        of creatures
+    ) {
 
-        if (!creature.alive) {
+        if (
+            !creature.alive
+        ) {
+
             continue;
         }
 
 
         const dx =
-            player.x - creature.x;
+            player.x -
+            creature.x;
 
         const dy =
-            player.y - creature.y;
+            player.y -
+            creature.y;
 
 
         const distance =
-            Math.abs(dx) +
-            Math.abs(dy);
 
+            Math.abs(
+                dx
+            ) +
 
-        /*
-            Spider reagerer bare når spilleren
-            er ganske nær.
-        */
-
-        if (distance > 8) {
-            continue;
-        }
-
-
-        /*
-            Ved siden av spilleren.
-        */
-
-        if (distance === 1) {
-
-            addLog(
-                "The spider watches you."
+            Math.abs(
+                dy
             );
 
+
+        /*
+            =========================================
+            FLEE
+            Rabbit / Deer
+            =========================================
+        */
+
+        if (
+            creature.behavior ===
+            "flee"
+        ) {
+
+            if (
+                distance <=
+                creature.detectionRange
+            ) {
+
+                moveCreatureAwayFromPlayer(
+                    creature
+                );
+
+            } else {
+
+                /*
+                    Litt rolig wandering når
+                    spilleren ikke er nær.
+                */
+
+                if (
+                    simulationRandom() <
+                    0.20
+                ) {
+
+                    wanderCreature(
+                        creature
+                    );
+                }
+            }
+
+
             continue;
         }
 
 
         /*
-            Enkel chase AI.
-
-            Ikke pathfinding ennå.
+            =========================================
+            HOSTILE
+            Spider
+            =========================================
         */
 
-        let moveX = 0;
-        let moveY = 0;
+        if (
+            creature.behavior ===
+            "hostile"
+        ) {
+
+            if (
+                distance >
+                creature.detectionRange
+            ) {
+
+                continue;
+            }
 
 
-        if (Math.abs(dx) > Math.abs(dy)) {
+            if (
+                distance === 1
+            ) {
 
-            moveX = Math.sign(dx);
+                addLog(
+                    `The ${creature.name.toLowerCase()} watches you.`
+                );
 
-        } else {
+                continue;
+            }
 
-            moveY = Math.sign(dy);
+
+            moveCreatureTowardPlayer(
+                creature
+            );
+
+
+            continue;
         }
 
 
-        const targetX =
-            creature.x + moveX;
-
-        const targetY =
-            creature.y + moveY;
-
+        /*
+            =========================================
+            PASSIVE FALLBACK
+            =========================================
+        */
 
         if (
-            isWalkable(targetX, targetY) &&
-            !getCreatureAt(targetX, targetY) &&
-            !(
-                targetX === player.x &&
-                targetY === player.y
-            )
+            simulationRandom() <
+            0.15
         ) {
 
-            creature.x = targetX;
-            creature.y = targetY;
+            wanderCreature(
+                creature
+            );
         }
     }
 }
@@ -18776,13 +31882,18 @@ function drawWorldObjects(
 
         const char =
 
-            object.depleted
+            object.state
+                ?.renderChar ??
 
-                ? definition
-                    .depletedChar
+            (
+                object.depleted
 
-                : definition
-                    .char;
+                    ? definition
+                        .depletedChar
+
+                    : definition
+                        .char
+            );
 
 
         const color =
@@ -18866,8 +31977,7 @@ function renderMinimap() {
 
     if (
         !minimapCanvas ||
-        !minimapCtx ||
-        world.length === 0
+        !minimapCtx
     ) {
 
         return;
@@ -18969,17 +32079,6 @@ function renderMinimap() {
             const worldY =
                 startY +
                 localY;
-
-
-            if (
-                !isInsideWorld(
-                    worldX,
-                    worldY
-                )
-            ) {
-
-                continue;
-            }
 
 
             const tile =
@@ -19257,39 +32356,36 @@ function getCamera() {
 
     const columns =
 
-        Math.min(
+        Math.max(
+            1,
 
-            WORLD_WIDTH,
-
-            Math.max(
-                1,
-
-                Math.ceil(
-                    canvas.width /
-                    CELL_WIDTH
-                )
+            Math.ceil(
+                canvas.width /
+                CELL_WIDTH
             )
         );
 
 
     const rows =
 
-        Math.min(
+        Math.max(
+            1,
 
-            WORLD_HEIGHT,
-
-            Math.max(
-                1,
-
-                Math.ceil(
-                    canvas.height /
-                    CELL_HEIGHT
-                )
+            Math.ceil(
+                canvas.height /
+                CELL_HEIGHT
             )
         );
 
 
-    let x =
+    /*
+        Kameraet følger player direkte.
+
+        Ingen clamp mot 0 eller world width/height,
+        så negative coordinates fungerer normalt.
+    */
+
+    const x =
 
         player.x -
         Math.floor(
@@ -19297,43 +32393,11 @@ function getCamera() {
         );
 
 
-    let y =
+    const y =
 
         player.y -
         Math.floor(
             rows / 2
-        );
-
-
-    x =
-
-        Math.max(
-
-            0,
-
-            Math.min(
-
-                WORLD_WIDTH -
-                    columns,
-
-                x
-            )
-        );
-
-
-    y =
-
-        Math.max(
-
-            0,
-
-            Math.min(
-
-                WORLD_HEIGHT -
-                    rows,
-
-                y
-            )
         );
 
 
@@ -19384,6 +32448,8 @@ function render() {
         canvas.height
     );
 
+    ensureActiveWorldChunks();
+
 
     const fontSize =
 
@@ -19427,13 +32493,17 @@ function render() {
                 camera.y + screenY;
 
 
-            if (!isInsideWorld(worldX, worldY)) {
+            const tile =
+                getTile(
+                    worldX,
+                    worldY
+                );
+
+
+            if (!tile) {
+
                 continue;
             }
-
-
-            const tile =
-                world[worldY][worldX];
 
             let definition =
                 TILES[
@@ -19484,6 +32554,16 @@ function render() {
     drawSettlements(
         camera
     );
+
+
+    /*
+        PHYSICAL SETTLEMENT NPCS
+    */
+
+    drawPhysicalPeople(
+        camera
+    );
+
 
     /*
         CREATURES
@@ -20087,40 +33167,95 @@ function startGame() {
 
     resetPlayerSurvival();
 
-    generateWorld(
-        WORLD_SEED
-    );
+
+    /*
+        PASS 2:
+        Infinite terrain world.
+
+        De gamle 300×300 generatorene for
+        settlements, natural objects og creatures
+        kjøres ikke nå.
+
+        De flyttes til chunks i senere pass.
+    */
+
+    world =
+        [];
+
+    worldObjects =
+        [];
+
+    creatures =
+        [];
+
+    settlements =
+        [];
+
+    factions =
+        [];
+
+    families =
+        [];
+
+    people =
+        [];
+
+    window.factions =
+    factions;
+
+    window.families =
+        families;
+
+    window.people =
+        people;
+
+    window.settlements =
+        settlements;
+
+    window.worldObjects =
+        worldObjects;
+
+    window.creatures =
+        creatures;
+
+    loadedContentChunkKeys.clear();
+
+    generatedSettlementRegionKeys.clear();
+
+    WORLDGEN.clearCache();
+
+    terrainOverrides.clear();
+
+    naturalObjectStates.clear();
+
+    wildCreatureStates.clear();
+
+    persistentObjectsByChunk.clear();
+
+    placedWorldObjectCounter =
+        1;
 
 
-    spawnCreatures(
-        WORLD_SEED
-    );
+    findPlayerSpawn();
+
+    ensureActiveWorldChunks();
 
 
     updateUI();
 
 
     addLog(
-        `World generated. Seed: ${WORLD_SEED}`
+        `Infinite world ready. Seed: ${WORLD_SEED}`
     );
 
     addLog(
-        `${settlements.length} settlements were founded.`
-    );
-
-    addLog(
-        `${factions.length} factions now inhabit the known world.`
-    );
-
-    addLog(
-        `${people.length} people live across the settlements.`
+        `Loaded chunks: ${WORLDGEN.getLoadedChunkCount()}`
     );
 
     addLog(
         "You enter the world."
     );
 
-    updateSettlementDiscovery();
 
     resizeCanvas();
 }
@@ -20496,6 +33631,70 @@ document.getElementById(
             return;
         }
 
+        /*
+            =====================================
+            OPEN PHYSICAL PERSON
+            =====================================
+        */
+
+        if (
+            action ===
+            "open-person"
+        ) {
+
+            const person =
+                getPersonById(
+
+                    interactionWindowState
+                        .targetId
+                );
+
+
+            if (!person) {
+
+                goBackInteractionWindow();
+
+                return;
+            }
+
+
+            const settlement =
+                getSettlementById(
+                    person.settlementId
+                );
+
+
+            if (!settlement) {
+
+                return;
+            }
+
+
+            /*
+                Bruk det eksisterende settlement/person
+                UI-systemet.
+
+                Vi lager altså ikke et nytt dialogue-system.
+            */
+
+            openSettlementWindow(
+                settlement
+            );
+
+
+            navigateSettlementWindow(
+
+                "person",
+
+                {
+                    personId:
+                        person.id
+                }
+            );
+
+
+            return;
+        }
 
         /*
             =====================================
@@ -20577,6 +33776,163 @@ document.getElementById(
 
                 renderInteractionWindow();
             }
+
+
+            return;
+        }
+
+        /*
+            =====================================
+            ATTACK CREATURE
+            =====================================
+        */
+
+        if (
+            action ===
+            "attack-creature"
+        ) {
+
+            if (
+                interactionWindowState
+                    .targetType !==
+                "creature"
+            ) {
+
+                return;
+            }
+
+
+            const creature =
+                getCreatureById(
+
+                    interactionWindowState
+                        .targetId
+                );
+
+
+            if (!creature) {
+
+                interactionWindowState.view =
+                    "list";
+
+                renderInteractionWindow();
+
+                return;
+            }
+
+
+            const success =
+                attackCreature(
+                    creature
+                );
+
+
+            if (!success) {
+
+                renderInteractionWindow();
+
+                return;
+            }
+
+
+            /*
+                Etter angrepet får creature AI en turn.
+
+                Rabbit/deer kan dermed ha løpt bort,
+                eller creature kan ha dødd.
+            */
+
+            interactionWindowState.view =
+                "list";
+
+            interactionWindowState.targetType =
+                null;
+
+            interactionWindowState.targetId =
+                null;
+
+
+            if (
+                getNearbyInteractionTargets()
+                    .length === 0
+            ) {
+
+                closeInteractionWindow();
+
+            } else {
+
+                renderInteractionWindow();
+            }
+
+
+            return;
+        }
+
+        /*
+            =====================================
+            BUTCHER
+            =====================================
+        */
+
+        if (
+            action ===
+            "butcher"
+        ) {
+
+            if (
+                interactionWindowState
+                    .targetType !==
+                "world_object"
+            ) {
+
+                return;
+            }
+
+
+            const object =
+                getWorldObjectById(
+
+                    interactionWindowState
+                        .targetId
+                );
+
+
+            if (!object) {
+
+                interactionWindowState.view =
+                    "list";
+
+                renderInteractionWindow();
+
+                return;
+            }
+
+
+            const success =
+                butcherWorldObject(
+                    object
+                );
+
+
+            if (!success) {
+
+                renderInteractionWindow();
+
+                return;
+            }
+
+
+            interactionWindowState.view =
+                "list";
+
+            interactionWindowState.targetType =
+                null;
+
+            interactionWindowState.targetId =
+                null;
+
+
+            renderInteractionWindow();
 
 
             return;

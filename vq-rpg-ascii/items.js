@@ -209,6 +209,95 @@ window.ITEM_DATA = {
         ]
     },
 
+    raw_meat: {
+
+        name:
+            "Raw Meat",
+
+        description:
+            "Fresh raw meat taken from a butchered animal.",
+
+        baseValue:
+            4,
+
+        tags: [
+            "food_raw",
+            "meat",
+            "ingredient"
+        ]
+    },
+
+
+    cooked_meat: {
+
+        name:
+            "Cooked Meat",
+
+        description:
+            "Meat cooked over an open fire.",
+
+        baseValue:
+            8,
+
+        foodValue:
+            7,
+
+        tags: [
+            "food",
+            "meat",
+            "cooked"
+        ],
+
+        effects: [
+
+            {
+                type:
+                    "hunger",
+
+                amount:
+                    28
+            }
+        ]
+    },
+
+
+    hide: {
+
+        name:
+            "Hide",
+
+        description:
+            "An animal hide that can later be processed into leather.",
+
+        baseValue:
+            6,
+
+        tags: [
+            "material",
+            "animal",
+            "hide"
+        ]
+    },
+
+
+    bone: {
+
+        name:
+            "Bone",
+
+        description:
+            "A cleaned animal bone useful for tools and crafting.",
+
+        baseValue:
+            3,
+
+        tags: [
+            "material",
+            "animal",
+            "bone"
+        ]
+    },
+
     medicinal_herb: {
 
         name:
@@ -301,6 +390,9 @@ window.ITEM_DATA = {
         toolType:
             "knife",
 
+        damage:
+            3,
+
         tags: [
             "tool",
             "knife",
@@ -322,6 +414,9 @@ window.ITEM_DATA = {
 
         equipSlot:
             "weapon",
+
+        damage:
+            5,
 
         tags: [
             "weapon",
